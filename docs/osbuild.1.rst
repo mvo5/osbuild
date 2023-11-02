@@ -137,6 +137,18 @@ To build a basic qcow2 image of Fedora 34, use:
 The pipeline definition ``./samples/fedora-boot.json`` is provided in the
 upstream source repository of **osbuild**.
 
+Note that this in itself will not produce a qcow2 image as it will
+only build the required artifacts, not all possible artifacts. To
+generate the actual image run:
+
+    |
+    | ID=$(osbuild samples/fedora-boot.json --inspect | jq -r '.pipeline.assembler.id')
+    | sudo osbuild samples/fedora-boot.json --output-dir ./output --export="$ID"
+    |
+
+This will generate the qcow image under `output/$ID/fedora-boot.qcow2`.
+
+
 Example 2: Run from a local checkout
 ------------------------------------
 
