@@ -641,3 +641,21 @@ class TestStages(test.TestBase):
             fields = _get_file_fields(image)
             assert "heads 12" in fields
             assert "sectors/track 42" in fields
+
+    def test_stage_users(self):
+        datadir = self.locate_test_data()
+        testdir = os.path.join(datadir, "stages", "users")
+
+        with self.osbuild as osb, tempfile.TemporaryDirectory(dir="/var/tmp") as outdir:
+            osb.compile_file(os.path.join(testdir, "b.json"), exports=["tree"], output_dir=outdir)
+
+            tree = os.path.join(outdir, "tree")
+            assert os.path.isdir(tree)
+
+            # check that the user is correctly created
+            output = subprocess.check_output([
+                "chroot", tree, "/usr/bin/id", "-u", "nohome"], text=True)
+            self.assertEqual(output, "1337\n")
+
+            # TODO: run ssh inside the container and check if
+            # ssh login actually really works
