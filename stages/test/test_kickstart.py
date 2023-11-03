@@ -28,6 +28,55 @@ test_cases = [
         },
         "expected": "lang en_US.UTF-8\nkeyboard us\ntimezone UTC",
     },
+    {
+        "options": {"zerombr": "true"},
+        "expected": "zerombr",
+    },
+    {
+        "options": {"clearpart": {}},
+        "expected": "clearpart",
+    },
+    {
+        "options": {"clearpart": {"all": True}},
+        "expected": "clearpart --all",
+    },
+    {
+        "options": {"clearpart": {"drives": ["hda","hdb"]}},
+        "expected": "clearpart --drives=hda,hdb",
+    },
+    {
+        "options": {"clearpart": {"drives": ["hda"]}},
+        "expected": "clearpart --drives=hda",
+    },
+    {
+        "options": {"clearpart": {"list": ["sda2","sda3"]}},
+        "expected": "clearpart --list=sda2,sda3",
+    },
+    {
+        "options": {"clearpart": {"list": ["sda2"]}},
+        "expected": "clearpart --list=sda2",
+    },
+    {
+        "options": {"clearpart": {"disklabel": "some-label"}},
+        "expected": "clearpart --disklabel=some-label",
+    },
+    {
+        "options": {"clearpart": {"linux": True}},
+        "expected": "clearpart --linux",
+    },
+    {
+        "options": {
+            "clearpart": {
+                "all": True,
+                "drives": ["hda", "hdb"],
+                "list": ["sda2","sda3"],
+                "disklabel": "some-label",
+                "linux": True,
+            }
+        },
+        "expected": "clearpart --all --drives=hda,hdb --list=sda2,sda3 --disklabel=some-label --linux",
+    },
+
 ]
 
 
