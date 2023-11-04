@@ -27,10 +27,26 @@ jobs:
     steps:
     - name: "Clone Repository"
       uses: actions/checkout@v3
+    - name: Get OSBUILD_TEST_STORE files
+      #if: "${{ matrix.test }}" == "tests.run_stages"
+      uses: actions/cache@v3
+      with:
+        path: "${{ github.workspace }}/.osbuild-test-store"
+        key: "${{ matrix.test }}"
     - name: "Run"
       uses: osbuild/containers/src/actions/privdocker@552e30cf1b4ed19c6ddaa57f96c342b3dff4227b
       with:
         image: ghcr.io/osbuild/osbuild-ci:latest-202308241910
         run: |
+          mkdir -p "/osb/host/${{ github.workspace }}/.osbuild-test-store"
+          # debug only
+          ls -a "/osb/host/${{ github.workspace }}/.osbuild-test-store"
+          touch "/osb/host/${{ github.workspace }}/.osbuild-test-store/lala"
+          ls -a "/osb/host/${{ github.workspace }}/.osbuild-test-store"
+          # this runs inside a docker container so the path needs adjusting
+          OSBUILD_TEST_STORE="/osb/host/${{ github.workspace }}/.osbuild-test-store" \
           TEST_CATEGORY="${{ matrix.test }}" \
           tox -e "${{ matrix.environment }}"
+    - name: Debug cache (can be removed)
+      run: |
+        ls -a "/${{ github.workspace }}/.osbuild-test-store"
