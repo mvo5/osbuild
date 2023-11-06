@@ -5,7 +5,8 @@ import tempfile
 from dataclasses import dataclass
 
 import pytest
-from org_osbuild_kickstart import main as kickstart_main
+
+from osbuild.testutil.imports import import_module_from_path
 
 
 @dataclass
@@ -40,12 +41,15 @@ def ks_test_cases_fixtures():
 
 
 def test_kickstart(ks_test_cases):
+    ks_stage_path = os.path.join(os.path.dirname(__file__), "../org.osbuild.kickstart")
+    ks_stage = import_module_from_path("ks_stage", ks_stage_path)
+
     ks_path = "kickstart/kfs.cfg"
     with tempfile.TemporaryDirectory("kickstart-test-") as tmpdir:
         for tc in ks_test_cases:
             options = {"path": ks_path}
             options.update(tc.options)
-            kickstart_main(tmpdir, options)
+            ks_stage.main(tmpdir, options)
 
             with open(os.path.join(tmpdir, ks_path), encoding="utf-8") as fp:
                 ks_content = fp.read()
