@@ -420,13 +420,21 @@
             "sha256:b37452649da277bc6f1e80f8c2250a16aa877444e1dcbba0d3546eef7d6fcda3",
             "sha256:e81e831345997c1dc0c997899368d590f2f254ce2f19409bd373924f7c8d1674",
             "sha256:5f75cc1f7b0007d303d9ca5415de60ab359334d0cd179d3002b4faf4fdb73cbe",
+            "sha256:e110f5c65c6cbb783fef5530dcf411fc307d7c2e8b28e6f9e17e28ad3e2e78c8",
             "sha256:3e3b80b4556a8d799593565783394b891daef4ca5eb8924f8c100bb1dcde3531",
             "sha256:beabb033ec52c377dd664f7893ae47173fe00db7cc1a01504d7615f9b979720a",
             "sha256:580857559e605453c8cd88065416e529cd6a206a34f1823786f6fb8a08fe5e67",
             "sha256:094f39d14df176a1f7dab3d43a2b3850da93b38a61791c8750fd0e703de29687",
+            "sha256:9ce3f0c0904ac22ab5769babebf43e7dcdb488b0ef999b2e9e88a5b5eb424e51",
+            "sha256:f68c93c0461c149bb17282dededf421cbc1fbfa5ac133b59bd362526f59e0d57",
+            "sha256:5db8cf84b1338a25c699e2ea897160828a28b7a28c02d6ed2c5487934bc1726a",
             "sha256:e9e6c62b6e20d807b61a089b0f8895ce958d33aed2b716ba442d1987be9f2543",
             "sha256:0c039aef60adad0b13c73a9ab7b1ac77d737d73f897c9d27e84d471e6600cf75",
+            "sha256:4a74ae08a713e9b4e74ff27bfaf57374312370402f90e2796e66c504557ae189",
+            "sha256:6297d7eee103c679a0f1ea411568d3940af3fe8f38e19388a1544df70bda8b3c",
             "sha256:49878cf02c3adc05c612665412a921d35603ae5c904ffc35c5aea3d8d5649975",
+            "sha256:b5d5e7255c85c3aa9d63598ef140de35843ab2485adf1cb9a9130be80aa0297f",
+            "sha256:c6b167033a2bba3e6a10a3d255e232f2339136a3a77e9e78990d16d356813190",
             "sha256:7bc2d61c327d701780f6fee8ab55a4a4fdb4bffea5a97072e7772ae14f5b7bf5",
             "sha256:b34c767bab93fb626c993b98e10547779fa5bec98865b9a66b914e45b4b14f6e",
             "sha256:8857513982b0c12e02eb0593baa9dc7cf570f2761a6bb4996fc8cf7d98402444",
@@ -458,6 +466,35 @@
         "name": "org.osbuild.kickstart",
         "options": {
           "path": "kickstart/ks.cfg",
+          "ostree": {
+            "osname": "some-osname",
+            "url": "http://example.com/foo",
+            "ref": "some-ref",
+            "remote": "some-remote",
+            "gpg": true
+          },
+          "liveimg": {
+            "url": "some-liveimg-url"
+          },
+          "groups": {
+            "somegrp": {
+              "gid": 2337
+            }
+          },
+          "users": {
+            "someusr": {
+              "uid": 1337,
+              "gid": 1337,
+              "groups": [
+                "grp1",
+                "grp2"
+              ],
+              "home": "/other/home/someusr",
+              "shell": "/bin/ksh",
+              "password": "$1$notreally",
+              "key": "ssh-rsa not-really-a-real-key"
+            }
+          },
           "lang": "en_US.UTF-8",
           "keyboard": "us",
           "timezone": "UTC"
@@ -655,23 +692,30 @@
         "sha256:e81e831345997c1dc0c997899368d590f2f254ce2f19409bd373924f7c8d1674": "https://rpmrepo.osbuild.org/v2/mirror/public/f34/f34-x86_64-fedora-20210512/Packages/p/procps-ng-3.3.17-1.fc34.x86_64.rpm",
         "sha256:c2147331efdfe52db58aeba0a7e211fd7729b33827d16fdbf84da74331cf2e32": "https://rpmrepo.osbuild.org/v2/mirror/public/f34/f34-x86_64-fedora-20210512/Packages/p/protobuf-c-1.3.3-7.fc34.x86_64.rpm",
         "sha256:5f75cc1f7b0007d303d9ca5415de60ab359334d0cd179d3002b4faf4fdb73cbe": "https://rpmrepo.osbuild.org/v2/mirror/public/f34/f34-x86_64-fedora-20210512/Packages/p/publicsuffix-list-dafsa-20190417-5.fc34.noarch.rpm",
+        "sha256:e110f5c65c6cbb783fef5530dcf411fc307d7c2e8b28e6f9e17e28ad3e2e78c8": "https://rpmrepo.osbuild.org/v2/mirror/public/f34/f34-x86_64-fedora-20210512/Packages/p/pykickstart-3.32-2.fc34.noarch.rpm",
         "sha256:3e3b80b4556a8d799593565783394b891daef4ca5eb8924f8c100bb1dcde3531": "https://rpmrepo.osbuild.org/v2/mirror/public/f34/f34-x86_64-fedora-20210512/Packages/p/python-pip-wheel-21.0.1-2.fc34.noarch.rpm",
         "sha256:beabb033ec52c377dd664f7893ae47173fe00db7cc1a01504d7615f9b979720a": "https://rpmrepo.osbuild.org/v2/mirror/public/f34/f34-x86_64-fedora-20210512/Packages/p/python-setuptools-wheel-53.0.0-1.fc34.noarch.rpm",
         "sha256:580857559e605453c8cd88065416e529cd6a206a34f1823786f6fb8a08fe5e67": "https://rpmrepo.osbuild.org/v2/mirror/public/f34/f34-x86_64-fedora-20210512/Packages/p/python-unversioned-command-3.9.2-1.fc34.noarch.rpm",
         "sha256:094f39d14df176a1f7dab3d43a2b3850da93b38a61791c8750fd0e703de29687": "https://rpmrepo.osbuild.org/v2/mirror/public/f34/f34-x86_64-fedora-20210512/Packages/p/python3-3.9.2-1.fc34.x86_64.rpm",
+        "sha256:9ce3f0c0904ac22ab5769babebf43e7dcdb488b0ef999b2e9e88a5b5eb424e51": "https://rpmrepo.osbuild.org/v2/mirror/public/f34/f34-x86_64-fedora-20210512/Packages/p/python3-chardet-4.0.0-1.fc34.noarch.rpm",
         "sha256:d57f9ab76f65a5d4e6e372a6c742a016019a11b1652f54c75dfaa5a8e5ca4c03": "https://rpmrepo.osbuild.org/v2/mirror/public/f34/f34-x86_64-fedora-20210512/Packages/p/python3-dnf-4.6.1-1.fc34.noarch.rpm",
         "sha256:59b2e0dcf99b49de75623a68ecb5e67831fd289e532c4eded0bc4914414db4e9": "https://rpmrepo.osbuild.org/v2/mirror/public/f34/f34-x86_64-fedora-20210512/Packages/p/python3-gpg-1.15.1-2.fc34.x86_64.rpm",
         "sha256:f78f0ef8bc6b0d19cf48095ecbd7830cfe1bdd5c5a2c82c64d3cedb6f803a9f4": "https://rpmrepo.osbuild.org/v2/mirror/public/f34/f34-x86_64-fedora-20210512/Packages/p/python3-hawkey-0.60.0-1.fc34.x86_64.rpm",
+        "sha256:f68c93c0461c149bb17282dededf421cbc1fbfa5ac133b59bd362526f59e0d57": "https://rpmrepo.osbuild.org/v2/mirror/public/f34/f34-x86_64-fedora-20210512/Packages/p/python3-idna-2.10-3.fc34.noarch.rpm",
         "sha256:311bf9bb88ae1d7700471ed4edabfbbab40020e514e61b42e6a4c7cf1c4ecd21": "https://rpmrepo.osbuild.org/v2/mirror/public/f34/f34-x86_64-fedora-20210512/Packages/p/python3-iniparse-0.4-43.fc34.noarch.rpm",
+        "sha256:5db8cf84b1338a25c699e2ea897160828a28b7a28c02d6ed2c5487934bc1726a": "https://rpmrepo.osbuild.org/v2/mirror/public/f34/f34-x86_64-fedora-20210512/Packages/p/python3-kickstart-3.32-2.fc34.noarch.rpm",
         "sha256:b855a1058dbe79fdb8b3e678dffaa18376e8462e72e6fbc4a8211c36f4bf3d7a": "https://rpmrepo.osbuild.org/v2/mirror/public/f34/f34-x86_64-fedora-20210512/Packages/p/python3-libcomps-0.1.15-6.fc34.x86_64.rpm",
         "sha256:d69feaba0fa4979747f760383f6013e17471b744d3ab9b845b4eeda6cc655d1f": "https://rpmrepo.osbuild.org/v2/mirror/public/f34/f34-x86_64-fedora-20210512/Packages/p/python3-libdnf-0.60.0-1.fc34.x86_64.rpm",
         "sha256:e9e6c62b6e20d807b61a089b0f8895ce958d33aed2b716ba442d1987be9f2543": "https://rpmrepo.osbuild.org/v2/mirror/public/f34/f34-x86_64-fedora-20210512/Packages/p/python3-libs-3.9.2-1.fc34.x86_64.rpm",
         "sha256:0c039aef60adad0b13c73a9ab7b1ac77d737d73f897c9d27e84d471e6600cf75": "https://rpmrepo.osbuild.org/v2/mirror/public/f34/f34-x86_64-fedora-20210512/Packages/p/python3-pip-21.0.1-2.fc34.noarch.rpm",
+        "sha256:4a74ae08a713e9b4e74ff27bfaf57374312370402f90e2796e66c504557ae189": "https://rpmrepo.osbuild.org/v2/mirror/public/f34/f34-x86_64-fedora-20210512/Packages/p/python3-pysocks-1.7.1-8.fc34.noarch.rpm",
         "sha256:09a0a4702e0f716caaf6f8e75dc478d3d70bf3fbd074a76fb4d6f8492af7c138": "https://rpmrepo.osbuild.org/v2/mirror/public/f34/f34-x86_64-fedora-20210512/Packages/p/python3-pyyaml-5.4.1-2.fc34.x86_64.rpm",
+        "sha256:6297d7eee103c679a0f1ea411568d3940af3fe8f38e19388a1544df70bda8b3c": "https://rpmrepo.osbuild.org/v2/mirror/public/f34/f34-x86_64-fedora-20210512/Packages/p/python3-requests-2.25.1-1.fc34.noarch.rpm",
         "sha256:45783e958a60d62115e29b961a4b374340a996784b6fc973d088e3e8020d4e24": "https://rpmrepo.osbuild.org/v2/mirror/public/f34/f34-x86_64-fedora-20210512/Packages/p/python3-rpm-4.16.1.3-1.fc34.x86_64.rpm",
         "sha256:49878cf02c3adc05c612665412a921d35603ae5c904ffc35c5aea3d8d5649975": "https://rpmrepo.osbuild.org/v2/mirror/public/f34/f34-x86_64-fedora-20210512/Packages/p/python3-setuptools-53.0.0-1.fc34.noarch.rpm",
         "sha256:b5d5e7255c85c3aa9d63598ef140de35843ab2485adf1cb9a9130be80aa0297f": "https://rpmrepo.osbuild.org/v2/mirror/public/f34/f34-x86_64-fedora-20210512/Packages/p/python3-six-1.15.0-5.fc34.noarch.rpm",
         "sha256:6f15994d7d8a15dae7ec45cf3448c0d3dc451b215e2eb76e6d8e7112b54aff0b": "https://rpmrepo.osbuild.org/v2/mirror/public/f34/f34-x86_64-fedora-20210512/Packages/p/python3-unbound-1.13.1-1.fc34.x86_64.rpm",
+        "sha256:c6b167033a2bba3e6a10a3d255e232f2339136a3a77e9e78990d16d356813190": "https://rpmrepo.osbuild.org/v2/mirror/public/f34/f34-x86_64-fedora-20210512/Packages/p/python3-urllib3-1.25.10-4.fc34.noarch.rpm",
         "sha256:979da51b083339510f083257054ff31d619d81c1e3fa09b6e4a7c6e30792e96c": "https://rpmrepo.osbuild.org/v2/mirror/public/f34/f34-x86_64-fedora-20210512/Packages/q/qemu-img-5.2.0-5.fc34.1.x86_64.rpm",
         "sha256:7bc2d61c327d701780f6fee8ab55a4a4fdb4bffea5a97072e7772ae14f5b7bf5": "https://rpmrepo.osbuild.org/v2/mirror/public/f34/f34-x86_64-fedora-20210512/Packages/q/qrencode-libs-4.0.2-7.fc34.x86_64.rpm",
         "sha256:b34c767bab93fb626c993b98e10547779fa5bec98865b9a66b914e45b4b14f6e": "https://rpmrepo.osbuild.org/v2/mirror/public/f34/f34-x86_64-fedora-20210512/Packages/r/readline-8.1-2.fc34.x86_64.rpm",

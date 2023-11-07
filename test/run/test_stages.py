@@ -641,3 +641,27 @@ class TestStages(test.TestBase):
             fields = _get_file_fields(image)
             assert "heads 12" in fields
             assert "sectors/track 42" in fields
+
+    def test_smoke_stage_kickstart(self):
+        """Vaidate that the written kickstart file passes ksvalidator"""
+        datadir = self.locate_test_data()
+        testdir = os.path.join(datadir, "stages", "kickstart")
+
+        with self.osbuild as osb, tempfile.TemporaryDirectory(dir="/var/tmp") as outdir:
+            osb.compile_file(os.path.join(testdir, "b.json"), exports=["tree"], output_dir=outdir)
+
+            tree = os.path.join(outdir, "tree")
+            assert os.path.isdir(tree)
+
+            # ensure the kickstart considers this a valid file
+            subprocess.run(
+                [
+                    "chroot", tree,
+                    "ksvalidator", "/kickstart/ks.cfg",
+                ],
+                # use PIPE here so that in case of validation errors we see
+                # the output
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True,
+            )

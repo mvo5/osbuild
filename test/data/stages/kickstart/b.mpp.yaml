@@ -17,9 +17,30 @@ pipeline:
               baseurl: https://rpmrepo.osbuild.org/v2/mirror/public/f34/f34-x86_64-fedora-20210512/
           packages:
             - systemd
+            - pykickstart
     - name: org.osbuild.kickstart
       options:
         path: kickstart/ks.cfg
+        ostree:
+          osname: some-osname
+          url: http://example.com/foo
+          ref: some-ref
+          remote: some-remote
+          gpg: true
+        liveimg:
+          url: some-liveimg-url
+        groups:
+          somegrp:
+            gid: 2337
+        users:
+          someusr:
+            uid: 1337
+            gid: 1337
+            groups: [grp1, grp2]
+            home: /other/home/someusr
+            shell: /bin/ksh
+            password: $1$notreally
+            key: ssh-rsa not-really-a-real-key
         lang: en_US.UTF-8
         keyboard: us
         timezone: UTC
