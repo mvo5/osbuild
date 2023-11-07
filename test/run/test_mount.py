@@ -15,6 +15,7 @@ from contextlib import contextmanager
 import pytest
 
 from osbuild import devices, host, meta, mounts
+from osbuild.util import linux
 
 from ..test import TestBase
 
@@ -27,15 +28,21 @@ def tmpdir_fixture():
 
 @contextmanager
 def make_arguments(opts):
-    os.makedirs("/run/osbuild/api")
-    with open("/run/osbuild/api/arguments", "w", encoding="utf-8") as f:
-        json.dump(opts, f)
-    try:
-        yield
-    finally:
-        os.remove("/run/osbuild/api/arguments")
-        os.rmdir("/run/osbuild/api")
+    os.makedirs("/run/osbuild/", exist_ok=True)
+    # The lock is needed to run the test in parallel, ideally the code
+    # would allow to point to a different API path *or* just accept
+    # the data from stdin
+    with open("/run/osbuild/test-mount-lock", "w") as lck:
+        linux.fcntl_flock(lck.fileno(), linux.fcntl.F_WRLCK, wait=True)
 
+        os.makedirs("/run/osbuild/api")
+        with open("/run/osbuild/api/arguments", "w", encoding="utf-8") as f:
+            json.dump(opts, f)
+        try:
+            yield
+        finally:
+            os.remove("/run/osbuild/api/arguments")
+            os.rmdir("/run/osbuild/api")
 
 @contextmanager
 def make_dev_tmpfs(tmpdir):
