@@ -17,6 +17,7 @@ pipeline:
               baseurl: https://rpmrepo.osbuild.org/v2/mirror/public/f34/f34-x86_64-fedora-20210512/
           packages:
             - systemd
+            - pykickstart
     - name: org.osbuild.kickstart
       options:
         path: kickstart/ks.cfg

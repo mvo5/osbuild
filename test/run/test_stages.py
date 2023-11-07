@@ -652,10 +652,47 @@ class TestStages(test.TestBase):
             tree = os.path.join(outdir, "tree")
             assert os.path.isdir(tree)
 
-            # check that the user is correctly created
+            # check that the user is correctly created (not really needed
+            # as we just called "adduser")
             output = subprocess.check_output([
-                "chroot", tree, "/usr/bin/id", "-u", "nohome"], text=True)
+                "chroot", tree,
+                "/usr/bin/id", "-u", "nohome"], text=True)
             self.assertEqual(output, "1337\n")
 
-            # TODO: run ssh inside the container and check if
-            # ssh login actually really works
+            # XXX: use nspawn here?
+            # ssh needs /dev/null
+            subprocess.run(
+                ["mount", "-o", "bind", "/dev", os.path.join(tree, "dev")])
+            self.addCleanup(
+                subprocess.run, ["umount", os.path.join(tree, "dev")])
+            
+            # check that ssh logins work
+            fake_host_key = os.path.join(tree, "tmp", "ssh_host_ed25519_key")
+            subprocess.run([
+                "chroot", tree,
+                "/usr/bin/ssh-keygen", "-f", fake_host_key,
+                "-N", "''",
+                "-t", "ed25519",
+            ], stdout=sys.stdout, stderr=sys.stderr)
+            sshd = subprocess.Popen(
+                [
+                    "chroot", tree,
+                    "/usr/sbin/sshd", "-D", "-p", "8022",
+                    "-o" f"HostKey={fake_host_key}",
+                ],
+                stdout=sys.stdout,
+                stderr=sys.stderr,
+            )
+            self.addCleanup(sshd.kill)
+
+            # TODO: detect when port is availabe
+            import time
+            time.sleep(1)
+
+            output = subprocess.check_output([
+                "chroot", tree,
+                "/usr/bin/ssh", "-p", "8022",
+                #"-i", 
+                "nohome@localhost",
+                "id", "-u"], text=True)
+            self.assertEqual(output, "1337\n")

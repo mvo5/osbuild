@@ -18,6 +18,8 @@ pipeline:
           packages:
             - pam
             - shadow-utils
+            - openssh-server
+            - openssh-clients
     - name: org.osbuild.users
       options:
         users:
