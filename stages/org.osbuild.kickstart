@@ -17,6 +17,57 @@ from typing import Dict, List
 import osbuild.api
 
 SCHEMA = r"""
+"definitions": {
+  "clearpart-options-ref": {
+    "description": "Removes partitions from the system, prior to creation of new partitions",
+    "type": "object",
+    "anyOf": [
+      {"required": ["all"]},
+      {"required": ["drives"]},
+      {"required": ["list"]},
+      {"required": ["disklabel"]},
+      {"required": ["linux"]}
+    ],
+    "properties": {
+      "all": {
+        "description": "Erases all partitions from the system",
+        "type": "boolean"
+      },
+      "drives": {
+        "description": "Specifies which drives to clear partitions from",
+        "type": "array",
+        "items": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9/:\\_|*-]+$"
+        }
+      },
+      "list": {
+        "description": "Specifies which partitions to clear",
+        "type": "array",
+        "items": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9]+$"
+        }
+      },
+      "disklabel": {
+        "description": "Create a set disk label when relabeling a disk",
+        "type": "string",
+        "pattern": "^[A-Za-z0-9_-]+$"
+      },
+      "linux": {
+        "description": "Erases all Linux partitions",
+        "type": "boolean"
+      }
+    }
+  },
+  "clearpart-options-array-ref": {
+    "type": "array",
+    "minItems": 1,
+    "items": {
+      "$ref": "#/definitions/clearpart-options-ref"
+    }
+  }
+},
 "additionalProperties": false,
 "required": ["path"],
 "properties": {
@@ -137,46 +188,10 @@ SCHEMA = r"""
     "description": "Reinitialize Partition Tables"
   },
   "clearpart": {
-    "description": "Removes partitions from the system, prior to creation of new partitions",
-    "type": "object",
-    "anyOf": [
-      {"required": ["all"]},
-      {"required": ["drives"]},
-      {"required": ["list"]},
-      {"required": ["disklabel"]},
-      {"required": ["linux"]}
-    ],
-    "properties": {
-      "all": {
-        "description": "Erases all partitions from the system",
-        "type": "boolean"
-      },
-      "drives": {
-        "description": "Specifies which drives to clear partitions from",
-        "type": "array",
-        "items": {
-          "type": "string",
-          "pattern": "^[A-Za-z0-9/:\\_|*-]+$"
-        }
-      },
-      "list": {
-        "description": "Specifies which partitions to clear",
-        "type": "array",
-        "items": {
-          "type": "string",
-          "pattern": "^[A-Za-z0-9]+$"
-        }
-      },
-      "disklabel": {
-        "description": "Create a set disk label when relabeling a disk",
-        "type": "string",
-        "pattern": "^[A-Za-z0-9_-]+$"
-      },
-      "linux": {
-        "description": "Erases all Linux partitions",
-        "type": "boolean"
-      }
-    }
+    "oneOf": [
+      { "$ref": "#/definitions/clearpart-options-ref" },
+      { "$ref": "#/definitions/clearpart-options-array-ref" }
+    ]
   },
   "reboot": {
     "description": "Reboot after the installation is successfully completed",
