@@ -27,6 +27,7 @@ import importlib.util
 import json
 import os
 import pkgutil
+import subprocess
 import sys
 from collections import deque
 from typing import (Any, Deque, Dict, List, Optional, Sequence, Set, Tuple,
