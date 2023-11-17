@@ -18,8 +18,9 @@ import sys
 import tempfile
 from operator import itemgetter
 
-# pylint: disable=import-error
-import pyalpm
+# only import when running for real, not in tests or for inspection
+if __name__ == "__main__":
+    import pyalpm
 
 from osbuild import api
 
