@@ -85,6 +85,10 @@ help:
 	@echo "    help:               Print this usage information."
 	@echo "    man:                Generate all man-pages"
 	@echo
+	@echo "    go:                 Generate all go stages"
+	@echo "    go-test:            Test all go stages"
+	@echo "    go-clean:           Clean all go stages"
+	@echo
 	@echo "    coverity-download:  Force a new download of the coverity tool"
 	@echo "    coverity-check:     Run the coverity test suite"
 	@echo "    coverity-submit:    Run coverity and submit the results"
@@ -120,6 +124,23 @@ $(MANPAGES_TROFF): $(BUILDDIR)/docs/%: $(SRCDIR)/docs/%.rst | $(BUILDDIR)/docs/
 
 .PHONY: man
 man: $(MANPAGES_TROFF)
+
+#
+## Go stages
+#
+GO_STAGES_IN = $(wildcard $(SRCDIR)/stages/go/*/main.go)
+GO_STAGES_OUT = $(patsubst %/,%, $(subst /go/,/,$(dir $(GO_STAGES_IN))))
+$(GO_STAGES_OUT): $(GO_STAGES_IN)
+	go build -o "$@" "$<"
+.PHONY: go go-clean go-test
+go: $(GO_STAGES_OUT)
+go-clean:
+	rm -f $(GO_STAGES_OUT)
+go-test: go
+	# XXX: ugly
+	for d in $(wildcard $(SRCDIR)/stages/go/*); do \
+		(cd $$d && go test ); \
+	done
 
 #
 # Coverity

@@ -27,6 +27,7 @@ import importlib.util
 import json
 import os
 import pkgutil
+import subprocess
 import sys
 from collections import deque
 from typing import (Any, Deque, Dict, List, Optional, Sequence, Set, Tuple,
@@ -410,6 +411,35 @@ class ModuleInfo:
 
     @classmethod
     def load(cls, root, klass, name) -> Optional["ModuleInfo"]:
+        base = cls.MODULES.get(klass)
+        if not base:
+            raise ValueError(f"Unsupported type: {klass}")
+        path = os.path.join(root, base, name)
+
+        try:
+            return cls._load_py(path, klass, name)
+        except (SyntaxError, UnicodeDecodeError):
+            pass
+        return cls._load_generic(path, klass, name)
+
+    @classmethod
+    def _load_generic(cls, path, klass, name) -> Optional["ModuleInfo"]:
+        output = subprocess.check_output([path, "--all"])
+        p = json.loads(output)
+        doclist = p.get("doc", "").split("\n")
+        info = {
+            "schema": {
+                "1": json.loads(p.get("schema", "{}")),
+                "2": json.loads(p.get("schema_2", "{}")),
+            },
+            'desc': doclist[0],
+            'info': "\n".join(doclist[1:]),
+            'caps': p.get("capabilities", set()),
+        }
+        return cls(klass, name, path, info)
+
+    @classmethod
+    def _load_py(cls, path, klass, name) -> Optional["ModuleInfo"]:
         names = ["SCHEMA", "SCHEMA_2", "CAPABILITIES"]
 
         def filter_type(lst, target):
@@ -418,11 +448,6 @@ class ModuleInfo:
         def targets(a):
             return [t.id for t in filter_type(a.targets, ast.Name)]
 
-        base = cls.MODULES.get(klass)
-        if not base:
-            raise ValueError(f"Unsupported type: {klass}")
-
-        path = os.path.join(root, base, name)
         try:
             with open(path, encoding="utf8") as f:
                 data = f.read()
