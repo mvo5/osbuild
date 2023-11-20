@@ -325,6 +325,7 @@ class JSONSeqMonitor(BaseMonitor):
 
     def _module(self, module):
         self._context.stage(module)
+        # XXX: subprogress hardcoded depth?
         self._progress.incr(depth=1)
 
     def log(self, message, origin: Optional[str] = None):
@@ -342,6 +343,70 @@ class JSONSeqMonitor(BaseMonitor):
         self.out.write("\x1e")
         json.dump(data, self.out)
         self.out.write("\n")
+
+
+class NiceProgressMonitor(BaseMonitor):
+    def __init__(self, fd: int, manifest: osbuild.Manifest):
+        super().__init__(fd, manifest)
+        self._ctx_ids: Set[str] = set()
+        self._progress = Progress("pipelines", len(manifest.pipelines))
+        self._context = Context(origin="org.osbuild")
+        # FIXME: use termios.TIOCGWINSZ
+        self._width = 79
+
+    def begin(self, pipeline: osbuild.Pipeline):
+        self._start_pipeline = time.time()
+        self._context.pipeline(pipeline)
+        self._progress.sub_progress(Progress("stages", len(pipeline.stages)))
+        self._progress.incr()
+        msg = f"Starting pipeline {self._progress.done + 1}/{self._progress.total}\n"
+        self._draw_progress(msg, depth=0, newline=True)
+
+    def finish(self, pipeline):
+        duration = int(time.time() - self._start_pipeline)
+        msg = f"Finished pipeline {self._progress.done + 1}/{self._progress.total} in {duration}s\n"
+        self._draw_progress(msg, depth=0, newline=True)
+
+    def stage(self, stage: osbuild.Stage):
+        self._module(stage)
+
+    def assembler(self, assembler):
+        self._module(assembler)
+
+    def _module(self, module):
+        self._start_module = time.time()
+        self._context.stage(module)
+        self._progress.incr(depth=1)
+        done = self._progress._sub_progress.done
+        total = self._progress._sub_progress.total
+        msg = f" Starting {module.name} ({done+1}/{total})\n"
+        self._draw_progress(msg, depth=1, newline=True)
+
+    def result(self, result: osbuild.pipeline.BuildResult):
+        duration = int(time.time() - self._start_module)
+        msg = f" Finished {result.name} in {duration}s"
+        self._draw_progress(msg, depth=1, newline=True)
+
+    def log(self, message, origin: Optional[str] = None):
+        oo = self._context.origin
+        if origin is not None:
+            self._context.origin = origin
+        line = LogLine(message=message, context=self._context, progress=self._progress)
+        self._draw_progress(line.message, depth=2)
+        # needs to be here as LogLine has a ref to self._context so updates
+        # before line.as_dict() will be have a different context
+        self._context.origin = oo
+
+    def _draw_progress(self, lines, depth, newline=False):
+        for msg in lines.split("\n"):
+            if not msg:
+                continue
+            self.out.write("\r")
+            self.out.write(f"{depth*' '}{msg[:self._width-depth]}")
+            if self._width > len(msg):
+                self.out.write((self._width - len(msg) - depth) * ' ')
+        if newline:
+            self.out.write("\n")
 
 
 def make(name, fd, manifest):
