@@ -37,7 +37,7 @@ jobs:
           # the other tests are not sufficiently isolated and will cause
           # random failures. But test_stages is the long running one with
           # almost 2h.
-          if [ "${{ matrix.test }}" = "test.run.test_stages" ]; then
+          if [[ "${{ matrix.test }}" =~ test.run.test_(assemblers|stages) ]]; then
               # Using 4 workers is a bit arbitrary, "auto" is probably too
               # aggressive.
               export TEST_WORKERS="-n 4"
