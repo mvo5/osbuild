@@ -13,6 +13,14 @@ from osbuild.testutil.imports import import_module_from_path
 
 TEST_INPUT = [
     ({
+        # XXX: "specifications" is long to type, maybe move to "spec"?
+        "specifications": [
+            {
+                "user": "user1",
+            },
+        ],
+    }, "user1 ALL = (ALL) ALL"),
+    ({
         "specifications": [
             {
                 "user": "user1",
@@ -91,7 +99,7 @@ def test_sudoers_valid(tmp_path_with_sudoers_d, test_input, expected):  # pylint
     [
         ({"specifications": "invalid"}, " is not of type 'array'"),
         ({"specifications": ["invalid"]}, " is not of type 'object'"),
-        ({"specifications": [{"user":"invalid;user"}]}, " does not match "),
+        ({"specifications": [{"user": "invalid;user"}]}, " does not match "),
     ],
 )
 def test_sudoers_schema_validation_bad(test_data, expected_err):

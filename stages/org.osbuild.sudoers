@@ -20,15 +20,18 @@ SCHEMA = r"""
     },
     "host": {
       "type": "string",
-      "pattern": "^[\\w]+$"
+      "pattern": "^[\\w]+$",
+      "default": "ALL"
     },
     "target": {
       "type": "string",
-      "pattern": "^[\\w]+$"
+      "pattern": "^[\\w]+$",
+      "default": "ALL"
     },
     "command": {
       "type": "string",
-      "pattern": "^[\\w]+$"
+      "pattern": "^[\\w]+$",
+      "default": "ALL"
     }
   },
   "properties": {
@@ -49,7 +52,8 @@ SCHEMA = r"""
               "$ref": "#/definitions/user"
             },
             "host": {
-              "$ref": "#/definitions/host"
+              "$ref": "#/definitions/host",
+              "default": "ALL"
             },
             "target": {
               "$ref": "#/definitions/target"
@@ -66,7 +70,7 @@ SCHEMA = r"""
 
 def write_specification(file, spec):
     """Write a single specification line to the open file object."""
-    file.write(f"{spec['user']} {spec['host']} = ({spec['target']}) {spec['command']}\n")
+    file.write(f"{spec.get('user', 'ALL')} {spec.get('host', 'ALL')} = ({spec.get('target', 'ALL')}) {spec.get('command', 'ALL')}\n")
 
 
 def main(tree, options):
