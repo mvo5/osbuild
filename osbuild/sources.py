@@ -4,9 +4,10 @@ import contextlib
 import json
 import os
 import tempfile
-from typing import ClassVar, Dict, Tuple
+from typing import ClassVar, Dict, List, Optional, Tuple
 
 from . import host
+from .meta import ModuleInfo
 from .objectstore import ObjectStore
 from .util.types import PathLike
 
@@ -16,7 +17,7 @@ class Source:
     A single source with is corresponding options.
     """
 
-    def __init__(self, info, items, options) -> None:
+    def __init__(self, info: Optional[ModuleInfo], items: Dict, options: Dict) -> None:
         self.info = info
         self.items = items or {}
         self.options = options
