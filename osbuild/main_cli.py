@@ -19,7 +19,7 @@ from osbuild.util.parsing import parse_size
 from osbuild.util.term import fmt as vt
 
 
-def parse_manifest(path):
+def parse_manifest(path: str) -> dict:
     if path == "-":
         manifest = json.load(sys.stdin)
     else:
@@ -29,7 +29,7 @@ def parse_manifest(path):
     return manifest
 
 
-def show_validation(result, name):
+def show_validation(result: osbuild.meta.ValidationResult, name: str) -> None:
     if name == "-":
         name = "<stdin>"
 

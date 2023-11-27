@@ -10,6 +10,7 @@ from . import buildroot, host, objectstore, remoteloop
 from .api import API
 from .devices import Device, DeviceManager
 from .inputs import Input, InputManager
+from .meta import ModuleInfo, RunnerInfo
 from .mounts import Mount, MountManager
 from .objectstore import ObjectStore
 from .sources import Source
@@ -245,7 +246,7 @@ class Stage:
 
 
 class Runner:
-    def __init__(self, info, name: Optional[str] = None) -> None:
+    def __init__(self, info: RunnerInfo, name: Optional[str] = None) -> None:
         self.info = info  # `meta.RunnerInfo`
         self.name = name or os.path.basename(info.path)
 
@@ -259,7 +260,7 @@ class Runner:
 
 
 class Pipeline:
-    def __init__(self, name: str, runner: Runner, build=None, source_epoch=None):
+    def __init__(self, name: str, runner: Runner, build: Optional[str] = None, source_epoch: Optional[int] = None):
         self.name = name
         self.build = build
         self.runner = runner
@@ -399,7 +400,7 @@ class Manifest:
         self.pipelines[name] = pipeline
         return pipeline
 
-    def add_source(self, info, items: List, options: Dict) -> Source:
+    def add_source(self, info: ModuleInfo, items: List, options: Dict) -> Source:
         source = Source(info, items, options)
         self.sources.append(source)
         return source

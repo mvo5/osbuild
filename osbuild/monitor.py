@@ -37,7 +37,7 @@ class TextWriter:
 
         self.write(text)
 
-    def write(self, text: str):
+    def write(self, text: str) -> None:
         """Write all of text to the log file descriptor"""
         data = text.encode("utf-8")
         n = len(data)
@@ -55,22 +55,22 @@ class BaseMonitor(abc.ABC):
         """Logging will be done to file descriptor `fd`"""
         self.out = TextWriter(fd)
 
-    def begin(self, pipeline: osbuild.Pipeline):
+    def begin(self, pipeline: osbuild.Pipeline) -> None:
         """Called once at the beginning of a build"""
 
-    def finish(self, result: Dict):
+    def finish(self, result: Dict) -> None:
         """Called at the very end of the build"""
 
-    def stage(self, stage: osbuild.Stage):
+    def stage(self, stage: osbuild.Stage) -> None:
         """Called when a stage is being built"""
 
-    def assembler(self, assembler: osbuild.Stage):
+    def assembler(self, assembler: osbuild.Stage) -> None:
         """Called when an assembler is being built"""
 
-    def result(self, result: osbuild.pipeline.BuildResult):
+    def result(self, result: osbuild.pipeline.BuildResult) -> None:
         """Called when a module is done with its result"""
 
-    def log(self, message: str):
+    def log(self, message: str) -> None:
         """Called for all module log outputs"""
 
 
