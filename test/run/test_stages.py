@@ -8,11 +8,13 @@ import functools
 import glob
 import json
 import os
+import pathlib
 import pprint
 import shutil
 import subprocess
 import tarfile
 import tempfile
+import textwrap
 import unittest
 import xml
 from collections.abc import Mapping
@@ -614,3 +616,72 @@ class TestStages(test.TestBase):
             fields = _get_file_fields(image)
             assert "heads 12" in fields
             assert "sectors/track 42" in fields
+
+    def _test_machine_id(self, manifest, checker):
+        datadir = self.locate_test_data()
+        testdir = pathlib.Path(datadir) / "stages/machine-id"
+
+        with self.osbuild as osb, tempfile.TemporaryDirectory(dir="/var/tmp") as outdir:
+            osb.compile_file(os.path.join(testdir, manifest),
+                             exports=["tree"],
+                             output_dir=outdir)
+
+            machine_id_path = pathlib.Path(outdir) / "tree/etc/machine-id"
+            assert machine_id_path.exists()
+
+            # precondition check
+            tree_path = pathlib.Path(outdir) / "tree"
+            assert not (pathlib.Path(tree_path) / "first-boot-yes").exists()
+            assert not (pathlib.Path(tree_path) / "first-boot-no").exists()
+            # use systemd-nspawn for a real integration test
+
+            # write two units to ensure that we stop even if something is wrong
+            for first_boot in ["yes", "no"]:
+                service_name = f"test-first-boot-{first_boot}.service"
+                test_service_path = pathlib.Path(tree_path) / f"etc/systemd/system/{service_name}"
+                test_service_path.write_bytes(textwrap.dedent(f"""[Unit]
+                ConditionFirstBoot={first_boot}
+
+                [Service]
+                Type=oneshot
+                ExecStart=/usr/bin/touch /first-boot-{first_boot}
+                ExecStopPost=/usr/bin/systemctl exit
+
+                [Install]
+                WantedBy=multi-user.target
+                """).encode("utf-8"))
+                # make sure service is availabe
+                subprocess.check_call([
+                    "systemctl", f"--root={tree_path}",
+                    "enable", service_name,
+                ])
+                subprocess.check_call(
+                    ["systemctl", "-q", f"--root={tree_path}", "enable", service_name])
+                # fc38 will disable everything not enabled in 99-default-disable.presets
+                preset_override_path = pathlib.Path(tree_path) / f"usr/lib/systemd/system-preset/50-enable-{pathlib.Path(service_name).with_suffix('.preset')}"
+                preset_override_path.write_text(f"enable {service_name}\n")
+
+            machine_id=f"machine-id-{os.getpid()}"
+            print("use 'machinectl shell {machine_id}' to inspect the test")
+            subprocess.check_call([
+                "systemd-nspawn",
+                "--boot",
+                f"--machine={machine_id}",
+                f"--directory={tree_path}",
+            ])
+            checker(tree_path)
+
+            # cache the downloaded data for the files source
+            osb.copy_source_data(self.store, "org.osbuild.files")
+
+    def test_machine_id_first_boot_yes(self):
+        def checker(tree_path):
+            assert (pathlib.Path(tree_path) / "first-boot-yes").exists()
+            assert not (pathlib.Path(tree_path) / "first-boot-no").exists()
+        self._test_machine_id("manifest-first-boot-yes.json", checker)
+
+    def test_machine_id_first_boot_no(self):
+        def checker(tree_path):
+            assert not (pathlib.Path(tree_path) / "first-boot-yes").exists()
+            assert (pathlib.Path(tree_path) / "first-boot-no").exists()
+        self._test_machine_id("manifest-first-boot-no.json", checker)
