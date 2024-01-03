@@ -17,9 +17,7 @@ def schema_validation_selinux(test_data):
 
     test_input = {
         "name": "org.osbuild.selinux",
-        "options": {
-            "file_contexts": "some-context",
-        },
+        "options": {},
     }
     test_input["options"].update(test_data)
     return schema.validate(test_input)
@@ -27,6 +25,7 @@ def schema_validation_selinux(test_data):
 
 @pytest.mark.parametrize("test_data,expected_err", [
     # good
+    ({}, ""),
     ({"file_contexts": "etc/selinux/targeted/contexts/files/file_contexts"}, ""),
     ({"labels": {"/usr/bin/cp": "system_u:object_r:install_exec_t:s0"}}, ""),
     ({"force_autorelabel": True}, ""),
@@ -45,20 +44,25 @@ def test_schema_validation_selinux(test_data, expected_err):
         err_msgs = [e.as_dict()["message"] for e in res.errors]
         assert expected_err in err_msgs[0]
 
-
+@pytest.mark.parametrize("test_data,expected_selinux_spec", [
+    ({}, ""),
+    ({"file_contexts": "/etc/selinux/path"}, "/etc/selinux/path"),
+])
 @patch("subprocess.run")
-def test_selinux_file_contexts(mocked_run, tmp_path):
+def test_selinux_file_contexts(mocked_run, tmp_path, test_data, expected_selinux_spec):
     stage_path = os.path.join(os.path.dirname(__file__), "../org.osbuild.selinux")
     stage = import_module_from_path("stage", stage_path)
 
-    options = {
-        "file_contexts": "/etc/selinux/thing",
-    }
+    options = {}
+    options.update(test_data)
     stage.main(tmp_path, options)
 
-    assert len(mocked_run.call_args_list) == 1
-    assert mocked_run.call_args_list == [
-        call(
-            ["setfiles", "-F", "-r", os.fspath(tmp_path),
-             "/etc/selinux/thing", os.fspath(tmp_path)], check=True),
-    ]
+    if expected_selinux_spec:
+        assert len(mocked_run.call_args_list) == 1
+        assert mocked_run.call_args_list == [
+            call(
+                ["setfiles", "-F", "-r", os.fspath(tmp_path),
+                 expected_selinux_spec, os.fspath(tmp_path)], check=True),
+        ]
+    else:
+        assert mocked_run.call_args_list == []
