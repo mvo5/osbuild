@@ -33,7 +33,6 @@ CAPABILITIES = ["CAP_MAC_ADMIN"]
 
 SCHEMA = """
 "additionalProperties": false,
-"required": ["file_contexts"],
 "properties": {
   "file_contexts": {
     "type": "string",
@@ -56,14 +55,17 @@ SCHEMA = """
 
 
 def main(tree, options):
-    file_contexts = os.path.join(f"{tree}", options["file_contexts"])
+    if "file_contexts" in options:
+        file_contexts = os.path.join(f"{tree}", options["file_contexts"])
+        subprocess.run(["setfiles", "-F", "-r", f"{tree}", f"{file_contexts}", f"{tree}"], check=True)
+
     labels = options.get("labels", {})
-
-    subprocess.run(["setfiles", "-F", "-r", f"{tree}", f"{file_contexts}", f"{tree}"], check=True)
-
     for path, label in labels.items():
         fullpath = os.path.join(tree, path.lstrip("/"))
-        selinux.setfilecon(fullpath, label)
+        # HACCCCCCCCKKKKKKKKK: quay.io/centos-bootc/centos-bootc:stream9
+        # does not have bootc
+        if os.path.exists(fullpath):
+            selinux.setfilecon(fullpath, label)
 
     if options.get("force_autorelabel", False):
         stamp = pathlib.Path(tree, ".autorelabel")

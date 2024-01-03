@@ -350,7 +350,12 @@ def copy_font(tree):
 def copy_efi_data(tree, vendor):
     """Copy the EFI binaries & data into /boot/efi"""
     for d in ['BOOT', vendor]:
-        source = f"/boot/efi/EFI/{d}"
+        # HACKKKKKKKKKKKKKKKK: quay.io/centos-bootc/fedora-bootc has no
+        # normal /boot/efi
+        if os.path.exists(f"/usr/lib/bootupd/updates/EFI/{d}"):
+            source = f"/usr/lib/bootupd/updates/EFI/{d}"
+        else:
+            source = f"/boot/efi/EFI/{d}"
         target = f"{tree}/boot/efi/EFI/{d}/"
         shutil.copytree(source, target,
                         symlinks=False)
