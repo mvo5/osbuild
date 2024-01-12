@@ -94,8 +94,18 @@ def ostree_container_deploy(tree, inputs, osname, target_imgref, kopts):
     for image in images.values():
         with containers.container_source(image) as (_, image_source):
             extra_args = []
-            imgref = f"ostree-unverified-image:{image_source}"
 
+            # older ostree versions do not understand dir
+            if image_source.startswith("dir:"):
+                new_image_source = "oci-archive:"+image_source.split(":")[1]+".oci-achive"
+                import subprocess
+                subprocess.run(
+                    ["skopeo", "copy", image_source, new_image_source],
+                    check=True,
+                )
+                image_source = new_image_source
+
+            imgref = f"ostree-unverified-image:{image_source}"
             extra_args.append(f'--imgref={imgref}')
             extra_args.append(f'--stateroot={osname}')
 
