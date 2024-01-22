@@ -6,6 +6,7 @@
 
 import contextlib
 import json
+import logging
 import os
 import pathlib
 import subprocess
@@ -466,11 +467,12 @@ def test_cache_load_updates_last_used_on_noatime(tmp_path):
 
 
 @pytest.mark.skipif(not has_precise_fs_timestamps(), reason="need precise fs timestamps")
-def test_cache_full_behavior(tmp_path):
+def test_cache_full_behavior(tmp_path, caplog):
     def _cache_size_from_file():
         with open(cache._path(cache._filename_cache_size), encoding="utf8") as fp:
             return json.load(fp)
 
+    caplog.set_level(logging.DEBUG, "logger=root.fscache")
     cache = fscache.FsCache("osbuild-cache-evict", tmp_path)
     with cache:
         # use big sizes to mask the effect of {dirs,cache.info} using
@@ -485,6 +487,8 @@ def test_cache_full_behavior(tmp_path):
                 rpath = os.path.join(tmp_path, rpath, f"f{i}")
                 with open(rpath, "wb") as fp:
                     fp.write(b'a' * obj_size)
+            # logging works
+            assert f"o{i}: store called" in caplog.text
             # info file is updated
             assert _cache_size_from_file() >= i * obj_size
             assert _cache_size_from_file() < (i + 1) * obj_size
@@ -493,12 +497,17 @@ def test_cache_full_behavior(tmp_path):
             assert cache._calculate_space(tmp_path) < (i + 1) * obj_size
             with cache.load(f"o{i}") as o:
                 assert o != ""
+            assert f"o{i}: cache hit" in caplog.text
             sleep_for_fs()
         # adding one more
         with cache.store("o-full") as rpath:
             rpath = os.path.join(tmp_path, rpath, "f-full")
             with open(rpath, "wb") as fp:
                 fp.write(b'b' * obj_size)
+        # logging works
+        assert f"LRU: removed objects/o1 of size" in caplog.text
+        assert f"LRU: removed objects/o2 of size" in caplog.text
+        assert caplog.text.count("LRU: removed objects") == 2
         # cache file is updated, it will free twice the size of the
         # requested obj
         assert _cache_size_from_file() >= 2 * obj_size

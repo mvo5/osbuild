@@ -8,6 +8,7 @@ used from tests to run the cli.
 
 import argparse
 import json
+import logging
 import os
 import sys
 
@@ -104,6 +105,8 @@ def parse_arguments(sys_argv):
 
 # pylint: disable=too-many-branches,too-many-return-statements,too-many-statements
 def osbuild_cli():
+    logging.basicConfig(level=logging.INFO)
+
     args = parse_arguments(sys.argv)
     desc = parse_manifest(args.manifest_path)
 

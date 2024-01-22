@@ -12,6 +12,7 @@ import contextlib
 import ctypes
 import errno
 import json
+import logging
 import os
 import subprocess
 import uuid
@@ -262,6 +263,9 @@ class FsCache(contextlib.AbstractContextManager, os.PathLike):
         self._lock = None
         self._info = FsCacheInfo()
         self._info_maximum_size = 0
+        self._logger = logging.getLogger("fscache")
+        if "fscache" in os.environ.get("OSBUILD_DEBUG_LOGS", "").split(","):
+            self._logger.setLevel(logging.DEBUG)
 
     def _trace(self, trace: str):
         """Trace execution
@@ -688,6 +692,7 @@ class FsCache(contextlib.AbstractContextManager, os.PathLike):
         else:
             raise ValueError(
                 f"maximum-size can only be set to 'unlimited' or an integer value, got {type(info.maximum_size)}")
+        self._logger.debug(f"fscache {self._path_cache} loaded with size {self._info_maximum_size}")
 
     def _is_active(self):
         # Internal helper to verify we are in an active context-manager.
@@ -897,6 +902,7 @@ class FsCache(contextlib.AbstractContextManager, os.PathLike):
         name
             Name to store the object under.
         """
+        self._logger.debug(f"{name}: store called")
 
         assert self._is_active()
         assert self._bootid is not None
@@ -947,6 +953,7 @@ class FsCache(contextlib.AbstractContextManager, os.PathLike):
 
             # Exit early if it never is going to fit
             if self._info_maximum_size > -1 and info["size"] > self._info_maximum_size:
+                self._logger.debug(f"{name}: size {info['size']} too big to fit cache size {self._info_maximum_size}")
                 return
 
             # Update the total cache-size. If it exceeds the limits, remove
@@ -960,11 +967,13 @@ class FsCache(contextlib.AbstractContextManager, os.PathLike):
             # violate any cache invariants. Future code needs to resync
             # the cache (e.g. on open with some simple journal strategy).
             if not self._update_cache_size(info["size"]):
+                self._logger.debug(f"{name}: size {info['size']} requires LRU eviction")
                 # try to free space
                 self._remove_lru(info["size"])
                 # and see if the update can happen now
                 if not self._update_cache_size(info["size"]):
                     # stil could not free enough space
+                    self._logger.debug(f"{name}: size {info['size']} does not fit after LRU eviction")
                     return
 
             try:
@@ -1051,6 +1060,7 @@ class FsCache(contextlib.AbstractContextManager, os.PathLike):
                 )
             except OSError as e:
                 if e.errno in [errno.EAGAIN, errno.ENOENT, errno.ENOTDIR]:
+                    self._logger.debug(f"{name}: cache miss")
                     raise self.MissError() from None
                 raise e
 
@@ -1060,6 +1070,7 @@ class FsCache(contextlib.AbstractContextManager, os.PathLike):
                 mtime=linux.c_timespec(tv_sec=0, tv_nsec=libc.UTIME_OMIT),
             )))
 
+            self._logger.debug(f"{name}: cache hit")
             yield os.path.join(
                 self._dirname_objects,
                 name,
@@ -1152,6 +1163,7 @@ class FsCache(contextlib.AbstractContextManager, os.PathLike):
                     size = self._calculate_space(self._path(rpath))
                     self._rm_r_object(rpath)
                     self._update_cache_size(-size)
+                    self._logger.debug(f"LRU: removed {rpath} of size {size}")
                     freed_so_far += size
                     if freed_so_far >= try_to_free:
                         break
