@@ -32,7 +32,6 @@ CAPABILITIES = ["CAP_MAC_ADMIN"]
 
 SCHEMA = """
 "additionalProperties": false,
-"required": ["file_contexts"],
 "properties": {
   "file_contexts": {
     "type": "string",
@@ -55,8 +54,10 @@ SCHEMA = """
 
 
 def main(tree, options):
-    file_contexts = os.path.join(f"{tree}", options["file_contexts"])
-    selinux.setfiles(file_contexts, os.fspath(tree), "")
+    file_contexts = options.get("file_contexts")
+    if file_contexts:
+        file_contexts_path = os.path.join(f"{tree}", file_contexts)
+        selinux.setfiles(file_contexts_path, os.fspath(tree), "")
 
     labels = options.get("labels", {})
     for path, label in labels.items():

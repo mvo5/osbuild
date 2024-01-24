@@ -29,6 +29,7 @@ def schema_validation_selinux(test_data, implicit_file_contexts=True):
 
 @pytest.mark.parametrize("test_data,expected_err", [
     # good
+    ({}, ""),
     ({"labels": {"/usr/bin/cp": "system_u:object_r:install_exec_t:s0"}}, ""),
     ({"force_autorelabel": True}, ""),
     # bad
@@ -43,14 +44,6 @@ def test_schema_validation_selinux(test_data, expected_err):
     else:
         assert res.valid is False
         testutil.assert_jsonschema_error_contains(res, expected_err, expected_num_errs=1)
-
-
-def test_schema_validation_selinux_file_context_required():
-    test_data = {}
-    res = schema_validation_selinux(test_data, implicit_file_contexts=False)
-    assert res.valid is False
-    expected_err = "'file_contexts' is a required property"
-    testutil.assert_jsonschema_error_contains(res, expected_err, expected_num_errs=1)
 
 
 @patch("osbuild.util.selinux.setfiles")
