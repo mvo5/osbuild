@@ -54,8 +54,15 @@ SCHEMA_2 = """
       "default": true
     },
     "root-node": {
-      "description": "How to handle the root node: include or omit",
+      "description": "How to handle the root node: include or omit, no effect if paths are supplied",
       "enum": ["include", "omit"]
+    },
+    "paths": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "description": "If specified, the archive will only contain the specified paths, in the specified order"
+      }
     }
   }
 },
@@ -78,6 +85,7 @@ def main(inputs, output_dir, options):
     filename = options["filename"].lstrip("/")
     tarfmt = options.get("format", "gnu")
     root_node = options.get("root-node", "include")
+    paths = options.get("paths", [])
 
     extra_args = []
     # Set environment variables for the tar operation.
@@ -106,13 +114,17 @@ def main(inputs, output_dir, options):
         "-C", tree,
     ]
 
-    # Should we include the root inode or not
-    # This will change the way files are listed:
-    # `./file` (include) vs `file` (omit)
-    if root_node == "include":
-        tar_cmd += ["."]
+    if len(paths) == 0:
+        # Should we include the root inode or not
+        # This will change the way files are listed:
+        # `./file` (include) vs `file` (omit)
+        if root_node == "include":
+            tar_cmd += ["."]
+        else:
+            tar_cmd += os.listdir(tree)
     else:
-        tar_cmd += os.listdir(tree)
+        tar_cmd += paths
+
 
     # Make a tarball of the tree.
     subprocess.run(
