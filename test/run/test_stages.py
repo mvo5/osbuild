@@ -365,6 +365,22 @@ class TestStages(test.TestBase):
             # cache the downloaded data for the files source
             osb.copy_source_data(self.store, "org.osbuild.files")
 
+        with self.osbuild as osb, tempfile.TemporaryDirectory(dir="/var/tmp") as outdir:
+            osb.compile_file(os.path.join(testdir, "tar.paths.json"),
+                             exports=["tree"],
+                             output_dir=outdir)
+
+            tree = os.path.join(outdir, "tree")
+            tp = os.path.join(tree, "tarfile.tar")
+            assert os.path.exists(tp)
+            assert tarfile.is_tarfile(tp)
+            tf = tarfile.open(tp)
+            names = tf.getnames()
+            self.assertEqual(["testfile2", "testfile", "testfile2"], names)
+
+            # cache the downloaded data for the files source
+            osb.copy_source_data(self.store, "org.osbuild.files")
+
     @unittest.skipUnless(have_sfdisk_with_json(), "Need sfdisk with JSON support")
     def _test_partitioning_stage(self, stage_name, sfdisk_out_filter_fn: Optional[Callable[[Dict], Dict]] = None):
         """
