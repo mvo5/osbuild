@@ -117,65 +117,76 @@ class CurlSource(sources.SourceService):
         quoted = purl._replace(path=path)
         return quoted.geturl()
 
+    def fetch_one(self, desc, checksum):
+        # XXX: why do we enforce fetch_one and fetch_many on the ABC level?
+        raise Exception("I only support fetch_all")
+
     def fetch_all(self, items: Dict) -> None:
-        filtered = filter(lambda i: not self.exists(i[0], i[1]), items.items())  # discards items already in cache
-        transformed = map(lambda i: self.transform(i[0], i[1]), filtered)  # prepare each item to be downloaded
-
-        with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            for _ in executor.map(self.fetch_one, *zip(*transformed)):
-                pass
-
-    def fetch_one(self, checksum, desc):
-        secrets = desc.get("secrets")
-        insecure = desc.get("insecure")
-        url = self._quote_url(desc.get("url"))
-        # Download to a temporary sub cache until we have verified the checksum. Use a
-        # subdirectory, so we avoid copying across block devices.
+        # some mirrors are sometimes broken. retry manually, because we could be
+        # redirected to a different, working, one on retry.
+        return_code = 0
         with tempfile.TemporaryDirectory(prefix="osbuild-unverified-file-", dir=self.cache) as tmpdir:
-            # some mirrors are sometimes broken. retry manually, because we could be
-            # redirected to a different, working, one on retry.
-            return_code = 0
             for _ in range(10):
+                curl_args = []
+                for checksum, desc in items.items():
+                    if self.exists(checksum, desc):
+                        continue
+                    if len(curl_args) > 0:
+                        curl_args.append("--next")
+                    checksum, desc = self.transform(checksum, desc)
+                    secrets = desc.get("secrets")
+                    insecure = desc.get("insecure")
+                    url = self._quote_url(desc.get("url"))
+                    # Download to a temporary sub cache until we have verified the checksum. Use a
+                    # subdirectory, so we avoid copying across block devices.
+                    curl_args.extend(["--output", checksum])
+                    if secrets:
+                        if secrets.get('ssl_ca_cert'):
+                            curl_args.extend(["--cacert", secrets.get('ssl_ca_cert')])
+                        if secrets.get('ssl_client_cert'):
+                            curl_args.extend(["--cert", secrets.get('ssl_client_cert')])
+                        if secrets.get('ssl_client_key'):
+                            curl_args.extend(["--key", secrets.get('ssl_client_key')])
+
+                    if insecure:
+                        curl_args.append("--insecure")
+
+                    # url must follow options
+                    curl_args.append(url)
+                    # TODO: ensure getconf ARG_MAX is honored and break into
+                    # multiple commands if needed
+
+                if not curl_args:
+                    break
                 curl_command = [
                     "curl",
                     "--silent",
-                    "--speed-limit", "1000",
+                    #"--speed-limit", "1000",
                     "--connect-timeout", "30",
                     "--fail",
                     "--location",
-                    "--output", checksum,
-                ]
-                if secrets:
-                    if secrets.get('ssl_ca_cert'):
-                        curl_command.extend(["--cacert", secrets.get('ssl_ca_cert')])
-                    if secrets.get('ssl_client_cert'):
-                        curl_command.extend(["--cert", secrets.get('ssl_client_cert')])
-                    if secrets.get('ssl_client_key'):
-                        curl_command.extend(["--key", secrets.get('ssl_client_key')])
-
-                if insecure:
-                    curl_command.append("--insecure")
-
-                # url must follow options
-                curl_command.append(url)
-
+                ] + curl_args
                 curl = subprocess.run(curl_command, encoding="utf-8", cwd=tmpdir, check=False)
                 return_code = curl.returncode
                 if return_code == 0:
                     break
-            else:
-                raise RuntimeError(f"curl: error downloading {url}: error code {return_code}")
+                else:
+                    raise RuntimeError(f"curl: error downloading {url}: error code {return_code}")
 
-            if not verify_file(f"{tmpdir}/{checksum}", checksum):
-                raise RuntimeError(f"checksum mismatch: {checksum} {url}")
+            # put back
+            for checksum, desc in items.items():
+                if self.exists(checksum, desc):
+                    continue
+                if not verify_file(f"{tmpdir}/{checksum}", checksum):
+                    raise RuntimeError(f"checksum mismatch: {checksum} {url}")
 
-            # The checksum has been verified, move the file into place. in case we race
-            # another download of the same file, we simply ignore the error as their
-            # contents are guaranteed to be  the same.
-            try:
-                os.rename(f"{tmpdir}/{checksum}", f"{self.cache}/{checksum}")
-            except FileExistsError:
-                pass
+                # The checksum has been verified, move the file into place. in case we race
+                # another download of the same file, we simply ignore the error as their
+                # contents are guaranteed to be  the same.
+                try:
+                    os.rename(f"{tmpdir}/{checksum}", f"{self.cache}/{checksum}")
+                except FileExistsError:
+                    pass
 
 
 def main():
