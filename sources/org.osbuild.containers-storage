@@ -1,0 +1,117 @@
+#!/usr/bin/python3
+"""Provide access to an image in the host system's container storage.
+
+This stage differs from other sources in that the source check's to see if
+the container is available in the host's container storage. This puts a requirement
+on the user to ensure that the container is copied into local storage before trying
+to build an image. The starts by reading the host's `/etc/containers/storage.conf`
+file and then using the config to check if the container has been imported.
+
+Buildhost commands used: `skopeo`.
+"""
+
+import hashlib
+import subprocess as sp
+import sys
+
+from osbuild import sources
+from osbuild.util import containers
+
+SCHEMA = """
+"additionalProperties": false,
+"definitions": {
+  "item": {
+    "description": "The container image to fetch indexed by the container image id",
+    "type": "object",
+    "additionalProperties": false,
+    "patternProperties": {
+      "sha256:[0-9a-f]{64}": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["image"],
+        "properties": {
+          "image": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "digest"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Name of the image (including registry)."
+              },
+              "digest": {
+                "type": "string",
+                "description": "Digest of image in registry.",
+                "pattern": "sha256:[0-9a-f]{64}"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+},
+"properties": {
+  "items": {"$ref": "#/definitions/item"},
+  "digests": {"$ref": "#/definitions/item"}
+},
+"oneOf": [{
+  "required": ["items"]
+}, {
+  "required": ["digests"]
+}]
+"""
+
+
+class ContainersStorageSource(sources.SourceService):
+
+    content_type = "org.osbuild.containers"
+
+    storage_conf = None
+
+    def local_image_name(self, imagename):
+        """
+        Construct the full image name that references an image with a given checksum in the local storage.
+        """
+        conf = containers.get_host_storage(self.storage_conf)
+        driver = conf["storage"]["driver"]
+        graphroot = conf["storage"]["graphroot"]
+        runroot = conf["storage"]["runroot"]
+        # TODO: include storage options
+        return f"containers-storage:[{driver}@{graphroot}+{runroot}]{imagename}"
+
+    def fetch_one(self, checksum, desc) -> None:
+        return
+
+    def fetch_all(self, items) -> None:
+        return
+
+    def exists(self, checksum, desc) -> bool:
+        image_id = checksum
+        image = desc["image"]
+        imagename = image["name"]
+        digest = image["digest"]
+
+        source = self.local_image_name(imagename)
+        res = sp.run(["skopeo", "inspect", "--raw", "--config", source], check=False, capture_output=True)
+
+        # fail early if the user hasn't imported the container into
+        # containers-storage
+        if res.returncode != 0:
+            raise RuntimeError(f"Container does not exist in local containers storage: {res.stderr}")
+
+        local_id = "sha256:" + hashlib.sha256(res.stdout).hexdigest()
+        if local_id != image_id:
+            raise RuntimeError(
+                f"Local container image {imagename}@{digest} has an id of {local_id}, but expected {image_id}")
+
+        return True
+
+
+def main():
+    service = ContainersStorageSource.from_args(sys.argv[1:])
+    service.main()
+
+
+if __name__ == '__main__':
+    main()
