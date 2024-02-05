@@ -145,6 +145,33 @@ class CurlSource(sources.SourceService):
             for _ in executor.map(self.fetch_one, *zip(*transformed)):
                 pass
 
+    def _download_and_verify(self, tmpdir, checksum, desc):
+        curl_command = [
+            "curl",
+            "--silent",
+            "--speed-limit", "1000",
+            "--connect-timeout", "30",
+            "--fail",
+            "--location",
+        ] + self._gen_curl_download_fragment(checksum, desc)
+
+        curl = subprocess.run(curl_command, encoding="utf-8", cwd=tmpdir, check=False)
+        return_code = curl.returncode
+        if return_code != 0:
+            return return_code
+
+        if not verify_file(f"{tmpdir}/{checksum}", checksum):
+            raise RuntimeError(f"checksum mismatch: {checksum} {url}")
+
+        # The checksum has been verified, move the file into place. in case we race
+        # another download of the same file, we simply ignore the error as their
+        # contents are guaranteed to be  the same.
+        try:
+            os.rename(f"{tmpdir}/{checksum}", f"{self.cache}/{checksum}")
+        except FileExistsError:
+            pass
+        return return_code
+
     def fetch_one(self, checksum, desc):
         # Download to a temporary sub cache until we have verified the checksum. Use a
         # subdirectory, so we avoid copying across block devices.
@@ -153,32 +180,11 @@ class CurlSource(sources.SourceService):
             # redirected to a different, working, one on retry.
             return_code = 0
             for _ in range(10):
-                curl_command = [
-                    "curl",
-                    "--silent",
-                    "--speed-limit", "1000",
-                    "--connect-timeout", "30",
-                    "--fail",
-                    "--location",
-                ] + self._gen_curl_download_fragment(checksum, desc)
-
-                curl = subprocess.run(curl_command, encoding="utf-8", cwd=tmpdir, check=False)
-                return_code = curl.returncode
+                return_code = self._download_and_verify(tmpdir, checksum, desc)
                 if return_code == 0:
                     break
             else:
                 raise RuntimeError(f"curl: error downloading {url}: error code {return_code}")
-
-            if not verify_file(f"{tmpdir}/{checksum}", checksum):
-                raise RuntimeError(f"checksum mismatch: {checksum} {url}")
-
-            # The checksum has been verified, move the file into place. in case we race
-            # another download of the same file, we simply ignore the error as their
-            # contents are guaranteed to be  the same.
-            try:
-                os.rename(f"{tmpdir}/{checksum}", f"{self.cache}/{checksum}")
-            except FileExistsError:
-                pass
 
 
 def main():
