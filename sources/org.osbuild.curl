@@ -117,6 +117,26 @@ class CurlSource(sources.SourceService):
         quoted = purl._replace(path=path)
         return quoted.geturl()
 
+    def _gen_curl_download_fragment(self, checksum, desc):
+        secrets = desc.get("secrets")
+        insecure = desc.get("insecure")
+        url = self._quote_url(desc.get("url"))
+        curl_command = [
+            "--output", checksum,
+        ]
+        if secrets:
+            if secrets.get('ssl_ca_cert'):
+                curl_command.extend(["--cacert", secrets.get('ssl_ca_cert')])
+            if secrets.get('ssl_client_cert'):
+                curl_command.extend(["--cert", secrets.get('ssl_client_cert')])
+            if secrets.get('ssl_client_key'):
+                curl_command.extend(["--key", secrets.get('ssl_client_key')])
+        if insecure:
+            curl_command.append("--insecure")
+        # url must follow options
+        curl_command.append(url)
+        return curl_command
+
     def fetch_all(self, items: Dict) -> None:
         filtered = filter(lambda i: not self.exists(i[0], i[1]), items.items())  # discards items already in cache
         transformed = map(lambda i: self.transform(i[0], i[1]), filtered)  # prepare each item to be downloaded
@@ -126,9 +146,6 @@ class CurlSource(sources.SourceService):
                 pass
 
     def fetch_one(self, checksum, desc):
-        secrets = desc.get("secrets")
-        insecure = desc.get("insecure")
-        url = self._quote_url(desc.get("url"))
         # Download to a temporary sub cache until we have verified the checksum. Use a
         # subdirectory, so we avoid copying across block devices.
         with tempfile.TemporaryDirectory(prefix="osbuild-unverified-file-", dir=self.cache) as tmpdir:
@@ -143,21 +160,7 @@ class CurlSource(sources.SourceService):
                     "--connect-timeout", "30",
                     "--fail",
                     "--location",
-                    "--output", checksum,
-                ]
-                if secrets:
-                    if secrets.get('ssl_ca_cert'):
-                        curl_command.extend(["--cacert", secrets.get('ssl_ca_cert')])
-                    if secrets.get('ssl_client_cert'):
-                        curl_command.extend(["--cert", secrets.get('ssl_client_cert')])
-                    if secrets.get('ssl_client_key'):
-                        curl_command.extend(["--key", secrets.get('ssl_client_key')])
-
-                if insecure:
-                    curl_command.append("--insecure")
-
-                # url must follow options
-                curl_command.append(url)
+                ] + self._gen_curl_download_fragment(checksum, desc)
 
                 curl = subprocess.run(curl_command, encoding="utf-8", cwd=tmpdir, check=False)
                 return_code = curl.returncode
