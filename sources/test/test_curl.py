@@ -45,5 +45,5 @@ def test_curl_fetch_one(mocked_run, tmp_path, sources_module):
         "url": "http://example.com/file1",
     }
     requested_file = "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    curl.fetch_one(requested_file, desc)
+    curl.fetch_all({requested_file: desc})
     assert (curl.cache / requested_file).exists()

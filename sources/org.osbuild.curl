@@ -137,13 +137,24 @@ class CurlSource(sources.SourceService):
         curl_command.append(url)
         return curl_command
 
-    def fetch_all(self, items: Dict) -> None:
-        filtered = filter(lambda i: not self.exists(i[0], i[1]), items.items())  # discards items already in cache
-        transformed = map(lambda i: self.transform(i[0], i[1]), filtered)  # prepare each item to be downloaded
-
-        with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            for _ in executor.map(self.fetch_one, *zip(*transformed)):
-                pass
+    def fetch_all(self, items: Dict):
+        # some mirrors are sometimes broken. retry manually, because we could be
+        # redirected to a different, working, one on retry.
+        for _ in range(10):
+            return_code = fetch_all_no_retry(items)
+            if return_code == 0:
+                return
+        raise RuntimeError(f"curl: error downloading {url}: error code {return_code}")
+    
+    def fetch_all_no_retry(self, items: Dict):
+        # Download to a temporary sub cache until we have verified the checksum. Use a
+        # subdirectory, so we avoid copying across block devices.
+        with tempfile.TemporaryDirectory(prefix="osbuild-unverified-file-", dir=self.cache) as tmpdir:
+            filtered = filter(lambda i: not self.exists(i[0], i[1]), items.items())  # discards items already in cache
+            transformed = map(lambda i: self.transform(i[0], i[1]), filtered)  # prepare each item to be downloaded
+            
+                
+            self._download_and_verify(tmpdir, checksum, desc)
 
     def _download_and_verify(self, tmpdir, checksum, desc):
         curl_command = [
@@ -171,20 +182,6 @@ class CurlSource(sources.SourceService):
         except FileExistsError:
             pass
         return return_code
-
-    def fetch_one(self, checksum, desc):
-        # Download to a temporary sub cache until we have verified the checksum. Use a
-        # subdirectory, so we avoid copying across block devices.
-        with tempfile.TemporaryDirectory(prefix="osbuild-unverified-file-", dir=self.cache) as tmpdir:
-            # some mirrors are sometimes broken. retry manually, because we could be
-            # redirected to a different, working, one on retry.
-            return_code = 0
-            for _ in range(10):
-                return_code = self._download_and_verify(tmpdir, checksum, desc)
-                if return_code == 0:
-                    break
-            else:
-                raise RuntimeError(f"curl: error downloading {url}: error code {return_code}")
 
 
 def main():
