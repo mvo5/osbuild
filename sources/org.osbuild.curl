@@ -25,7 +25,7 @@ import subprocess
 import sys
 import tempfile
 import urllib.parse
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 from osbuild import sources
 from osbuild.util.checksum import verify_file
@@ -100,9 +100,11 @@ def _quote_url(url: str) -> str:
     return quoted.geturl()
 
 
-def _gen_curl_download_config(chksum_desc_tuple: List[Tuple[str, Dict]], config_path: pathlib.Path):
+def _gen_curl_download_config(items: List[Dict], config_path: pathlib.Path):
+    """Generate a curl config file for the given items to download"""
     with open(config_path, "w", encoding="utf8") as fp:
-        for checksum, desc in chksum_desc_tuple:
+        for desc in items:
+            checksum = desc["checksum"]
             url = _quote_url(desc.get("url"))
             fp.write(f'url = "{url}"\n')
             fp.write(f'output = "{checksum}"\n')
@@ -126,14 +128,12 @@ def _gen_curl_download_config(chksum_desc_tuple: List[Tuple[str, Dict]], config_
             fp.write("\n")
 
 
-# TODO: the data structures here are really unwieldy, move it all into
-# a dict, i.e. merge chksum into dict and then just deal with List[Dict]
-def _split_chksum_desc_tuples(chksum_desc_tuples: List[Tuple[str, Dict]], n: int) -> List[List[Tuple[str, Dict]]]:
+def _split_items(items: List[Dict], n: int) -> List[List[Dict]]:
     """ Split the given list of download items into maximum n partitions """
-    n = min(len(chksum_desc_tuples), n)
+    n = min(len(items), n)
     per_worker_items = [[] for _ in range(n)]
-    for i, chksum_desc_tuple in enumerate(chksum_desc_tuples):
-        per_worker_items[i % n].append(chksum_desc_tuple)
+    for i, desc in enumerate(items):
+        per_worker_items[i % n].append(desc)
     return per_worker_items
 
 
@@ -147,50 +147,57 @@ class CurlSource(sources.SourceService):
         super().__init__(*args, **kwargs)
         self.subscriptions = None
 
-    def transform(self, checksum, desc):
-        url = desc
-        if not isinstance(url, dict):
-            url = {"url": url}
-
+    def transform(self, checksum: str, desc: Dict) -> Dict:
+        """transform takes a checksum, desc and returns a single dict
+        with all needed data (secrets, checksum)
+        """
+        # compat?
+        if not isinstance(desc, dict):
+            desc = {"url": desc}
+        # ensure desc describes the item completely
+        desc["checksum"] = checksum
         # check if url needs rhsm secrets
-        if url.get("secrets", {}).get("name") == "org.osbuild.rhsm":
+        if desc.get("secrets", {}).get("name") == "org.osbuild.rhsm":
             # rhsm secrets only need to be retrieved once and can then be reused
             if self.subscriptions is None:
                 self.subscriptions = Subscriptions.from_host_system()
-            url["secrets"] = self.subscriptions.get_secrets(url.get("url"))
-        elif url.get("secrets", {}).get("name") == "org.osbuild.mtls":
+            desc["secrets"] = self.subscriptions.get_secrets(desc.get("url"))
+        elif desc.get("secrets", {}).get("name") == "org.osbuild.mtls":
             key = os.getenv("OSBUILD_SOURCES_CURL_SSL_CLIENT_KEY")
             cert = os.getenv("OSBUILD_SOURCES_CURL_SSL_CLIENT_CERT")
             if not (key and cert):
                 raise RuntimeError(f"mtls secrets required but key ({key}) or cert ({cert}) not defined")
-            url["secrets"] = {
+            desc["secrets"] = {
                 'ssl_ca_cert': os.getenv("OSBUILD_SOURCES_CURL_SSL_CA_CERT"),
                 'ssl_client_cert': cert,
                 'ssl_client_key': key,
             }
 
-        return checksum, url
+        return desc
 
     def fetch_all(self, items: Dict) -> None:
-        filtered = filter(lambda i: not self.exists(i[0], i[1]), items.items())  # discards items already in cache
-        transformed = map(lambda i: self.transform(i[0], i[1]), filtered)  # prepare each item to be downloaded
+        # discards items already in cache
+        filtered = filter(lambda i: not self.exists(i[0], i[1]), items.items())
+        # prepare each item to be downloaded by adding the checksum
+        # and secrets to each download item
+        transformed = map(lambda i: self.transform(i[0], i[1]), filtered)
 
-        # split the items to download accross workers
-        per_worker_items = _split_chksum_desc_tuples(list(transformed), self.max_workers)
+        # split the download items accross workers
+        per_worker_items = _split_items(list(transformed), self.max_workers)
 
-        # TODO: we could use "curl --parallel" for newer versions of curl
-        # (7.68+) instead of this threading stuff but that is not available
-        # on RHEL8 yet
+        # we could use "curl --parallel" for newer versions of curl
+        # (7.68+) instead of this threading stuff but that is not
+        # available on RHEL8 yet
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             for _ in executor.map(self.fetch_many, per_worker_items):
                 pass
 
-    def fetch_many(self, checksum_desc: List[Tuple[str, Dict]]):
+    def fetch_many(self, items: List[Dict]):
         # Download to a temporary sub cache until we have verified the checksum. Use a
         # subdirectory, so we avoid copying across block devices.
         with tempfile.TemporaryDirectory(prefix="osbuild-unverified-file-", dir=self.cache) as tmpdir:
             curl_config_path = f"{tmpdir}/curl-config.txt"
-            _gen_curl_download_config(checksum_desc, curl_config_path)
+            _gen_curl_download_config(items, curl_config_path)
             # some mirrors are sometimes broken. retry manually, because we could be
             # redirected to a different, working, one on retry.
             return_code = 0
@@ -211,7 +218,8 @@ class CurlSource(sources.SourceService):
             else:
                 raise RuntimeError(f'curl error: "{curl.stderr}": error code {return_code}')
 
-            for checksum, desc in checksum_desc:
+            for desc in items:
+                checksum = desc["checksum"]
                 if not verify_file(f"{tmpdir}/{checksum}", checksum):
                     raise RuntimeError(f"checksum mismatch: {checksum} {desc['url']}")
 
