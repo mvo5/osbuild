@@ -15,6 +15,7 @@ up the download.
 import concurrent.futures
 import os
 import pathlib
+import re
 import subprocess
 import sys
 import tempfile
@@ -85,6 +86,20 @@ SCHEMA = """
   "required": ["urls"]
 }]
 """
+
+def _curl_has_parallel_downloads():
+    output = subprocess.check_output(["curl", "--version"], universal_newlines=True)
+    m = re.match(r'^curl (\d+\.\d+\.\d+)', output.split("\n")[0])
+    if not m:
+        # issue warning here?
+        return False
+    major, minor, micro = m.group(1).split(".")
+    if int(major) > 7:
+        return True
+    if int(major) == 7 and int(minor) >= 68:
+        return True
+    return False
+
 
 def _gen_curl_download_config(items: Dict, config_path: pathlib.Path):
     with config_path.open("w", encoding="utf8") as fp:
@@ -175,6 +190,8 @@ class CurlSource(sources.SourceService):
             "--location",
             "--config", os.fspath(curl_config_path),
         ]
+        if _curl_has_parallel_downloads():
+            curl_command.append("--parallel")
         curl = subprocess.run(
             curl_command, encoding="utf-8", cwd=tmpdir, check=False)
         return curl.returncode
