@@ -19,7 +19,7 @@ import subprocess
 import sys
 import tempfile
 import urllib.parse
-from typing import Dict
+from typing import Dict, List
 
 from osbuild import sources
 from osbuild.util.checksum import verify_file
@@ -86,9 +86,9 @@ SCHEMA = """
 }]
 """
 
-def _gen_curl_download_config(items: Dict, config_path: pathlib.Path):
+def _gen_curl_download_config(items: List, config_path: pathlib.Path):
     with config_path.open("w", encoding="utf8") as fp:
-        for checksum, desc in items.items():
+        for checksum, desc in items:
             url = desc.get("url")
             fp.write(f'url = "{url}"\n')
             fp.write(f'output = "{checksum}"\n')
@@ -143,26 +143,6 @@ class CurlSource(sources.SourceService):
         quoted = purl._replace(path=path)
         return quoted.geturl()
 
-    def _gen_curl_download_fragment(self, checksum, desc):
-        secrets = desc.get("secrets")
-        insecure = desc.get("insecure")
-        url = self._quote_url(desc.get("url"))
-        curl_command = [
-            "--output", checksum,
-        ]
-        if secrets:
-            if secrets.get('ssl_ca_cert'):
-                curl_command.extend(["--cacert", secrets.get('ssl_ca_cert')])
-            if secrets.get('ssl_client_cert'):
-                curl_command.extend(["--cert", secrets.get('ssl_client_cert')])
-            if secrets.get('ssl_client_key'):
-                curl_command.extend(["--key", secrets.get('ssl_client_key')])
-        if insecure:
-            curl_command.append("--insecure")
-        # url must follow options
-        curl_command.append(url)
-        return curl_command
-
     def fetch_one(self):
         raise Exception("use fetch_all()")
 
@@ -170,22 +150,27 @@ class CurlSource(sources.SourceService):
         # some mirrors are sometimes broken. retry manually, because we could be
         # redirected to a different, working, one on retry.
         for _ in range(10):
-            return_code = self.fetch_all_no_retry(items)
-            if return_code == 0:
-                return
-        raise RuntimeError(f"curl: error downloading {items}: error code {return_code}")
+            filtered = filter(lambda i: not self.exists(i[0], i[1]), items.items())  # discards items already in cache
+            transformed = list(map(lambda i: self.transform(i[0], i[1]), filtered))
+            if len(transformed) == 0:
+                break
+            return_code = self.fetch_all_no_retry(transformed)
+        else:
+            raise RuntimeError(f"curl: error downloading {transformed}: error code {return_code}")
     
-    def fetch_all_no_retry(self, items: Dict):
+    def fetch_all_no_retry(self, items: List):
         # Download to a temporary sub cache until we have verified the checksum. Use a
         # subdirectory, so we avoid copying across block devices.
         with tempfile.TemporaryDirectory(prefix="osbuild-unverified-file-", dir=self.cache) as tmpdir:
-            filtered = filter(lambda i: not self.exists(i[0], i[1]), items.items())  # discards items already in cache
-            transformed = map(lambda i: self.transform(i[0], i[1]), filtered)  # prepare each item to be downloaded
-            for checksum, desc in items.items():
-                self._download_and_verify(tmpdir, checksum, desc)
-                
+            tmpdir = pathlib.Path(tmpdir)
+            return_code = self._download_items(tmpdir, items)
+            self._verify_items(tmpdir, items)
+        return return_code
 
-    def _download_and_verify(self, tmpdir, checksum, desc):
+    def _download_items(self, tmpdir: pathlib.Path, items: List):
+        curl_config_path = tmpdir / "curl-config.txt"
+        _gen_curl_download_config(items, curl_config_path)
+        # TODO: add --parallel here with new enough curl
         curl_command = [
             "curl",
             "--silent",
@@ -193,24 +178,28 @@ class CurlSource(sources.SourceService):
             "--connect-timeout", "30",
             "--fail",
             "--location",
-        ] + self._gen_curl_download_fragment(checksum, desc)
+            "--config", os.fspath(curl_config_path),
+        ]
+        print(curl_command)
+        curl = subprocess.run(
+            curl_command, encoding="utf-8", cwd=tmpdir, check=False)
+        return curl.returncode
 
-        curl = subprocess.run(curl_command, encoding="utf-8", cwd=tmpdir, check=False)
-        return_code = curl.returncode
-        if return_code != 0:
-            return return_code
+    def _verify_items(self, tmpdir: pathlib.Path, items: Dict):
+        for checksum, desc in items:
+            downloaded_path = tmpdir / checksum
+            if not downloaded_path.exists():
+                continue
+            if not verify_file(downloaded_path, checksum):
+                raise RuntimeError(f"checksum mismatch: {checksum} {desc['url']}")
 
-        if not verify_file(f"{tmpdir}/{checksum}", checksum):
-            raise RuntimeError(f"checksum mismatch: {checksum} {url}")
-
-        # The checksum has been verified, move the file into place. in case we race
-        # another download of the same file, we simply ignore the error as their
-        # contents are guaranteed to be  the same.
-        try:
-            os.rename(f"{tmpdir}/{checksum}", f"{self.cache}/{checksum}")
-        except FileExistsError:
-            pass
-        return return_code
+            # The checksum has been verified, move the file into place. in case we race
+            # another download of the same file, we simply ignore the error as their
+            # contents are guaranteed to be  the same.
+            try:
+                os.rename(f"{tmpdir}/{checksum}", f"{self.cache}/{checksum}")
+            except FileExistsError:
+                pass
 
 
 def main():
