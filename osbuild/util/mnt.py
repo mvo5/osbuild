@@ -44,12 +44,17 @@ class MountGuard(contextlib.AbstractContextManager):
     def __init__(self):
         self.mounts = []
 
-    def mount(self, source, target, bind=True, ro=False, mode="0755"):
+    def mount(self, source, target, bind=True, ro=False, rw=False, mode="0755"):
         options = []
         if bind:
             options += ["bind"]
+        # TODO: this is internal API, so maybe we could change this
+        # to some kind of mode and either explictly set 'ro' or 'rw'
+        # instead of having an option for both
         if ro:
             options += ["ro"]
+        if rw:
+            options += ["rw"]
         if mode:
             options += [mode]
 
