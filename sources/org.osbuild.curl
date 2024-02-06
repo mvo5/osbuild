@@ -14,6 +14,7 @@ up the download.
 
 import concurrent.futures
 import os
+import pathlib
 import subprocess
 import sys
 import tempfile
@@ -84,6 +85,32 @@ SCHEMA = """
   "required": ["urls"]
 }]
 """
+
+
+def _gen_curl_download_config(items: Dict, config_path: pathlib.Path):
+    with config_path.open("w", encoding="utf8") as fp:
+        for checksum, desc in items.items():
+            url = desc.get("url")
+            fp.write(f'url = "{url}"\n')
+            fp.write(f'output = "{checksum}"\n')
+            secrets = desc.get("secrets")
+            if secrets:
+                ssl_ca_cert = secrets.get('ssl_ca_cert')
+                if ssl_ca_cert:
+                    fp.write(f'cacert = "{ssl_ca_cert}"\n')
+                ssl_client_cert = secrets.get('ssl_client_cert')
+                if ssl_client_cert:
+                    fp.write(f'cert = "{ssl_client_cert}"\n')
+                ssl_client_key = secrets.get('ssl_client_key')
+                if ssl_client_key:
+                    fp.write(f'key = "{ssl_client_key}"\n')
+
+            insecure = desc.get("insecure")
+            if insecure:
+                fp.write('insecure\n')
+            else:
+                fp.write('no-insecure\n')
+            fp.write("\n")
 
 
 class CurlSource(sources.SourceService):
