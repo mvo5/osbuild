@@ -132,6 +132,17 @@ class CurlSource(sources.SourceService):
 
     content_type = "org.osbuild.files"
 
+    max_workers = 2 * (os.cpu_count() or 1)
+
+    CURL_COMMAND = [
+            "curl",
+            "--silent",
+            "--speed-limit", "1000",
+            "--connect-timeout", "30",
+            "--fail",
+            "--location",
+    ]
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.subscriptions = None
@@ -165,7 +176,7 @@ class CurlSource(sources.SourceService):
             return_code = self.fetch_all_no_retry(transformed)
         else:
             raise RuntimeError(f"curl: error downloading {transformed}: error code {return_code}")
-    
+
     def fetch_all_no_retry(self, items: Dict):
         # Download to a temporary sub cache until we have verified the checksum. Use a
         # subdirectory, so we avoid copying across block devices.
@@ -176,23 +187,45 @@ class CurlSource(sources.SourceService):
         return return_code
 
     def _download_items(self, tmpdir: pathlib.Path, items: Dict):
+        # XXX: add helper to force old school
+        if _curl_has_parallel_downloads():
+            return self._download_items_modern_curl(tmpdir, items)
+        else:
+            # XXX: do we really need this or just use curl in a single
+            # thread with --config so that it just reuses the connection
+            return self._download_items_old_curl(tmpdir, items)
+
+    def _download_items_modern_curl(self, tmpdir: pathlib.Path, items: Dict):
         curl_config_path = tmpdir / "curl-config.txt"
         _gen_curl_download_config(items, curl_config_path)
-        # TODO: add --parallel here with new enough curl
-        curl_command = [
-            "curl",
-            "--silent",
-            "--speed-limit", "1000",
-            "--connect-timeout", "30",
-            "--fail",
-            "--location",
+        curl_command = self.CURL_COMMAND + [
             "--config", os.fspath(curl_config_path),
+            "--parallel",
         ]
-        if _curl_has_parallel_downloads():
-            curl_command.append("--parallel")
         curl = subprocess.run(
             curl_command, encoding="utf-8", cwd=tmpdir, check=False)
         return curl.returncode
+
+    def _download_items_old_curl(self, tmpdir: pathlib.Path, items: Dict):
+        # split items into max_worker partitions
+        per_worker_items = [{} for _ in range(self.max_workers)]
+        for i, key in enumerate(items):
+            per_worker_items[i % self.max_workers][key] = items[key]
+        workers = []
+        for i, wi in enumerate(per_worker_items):
+            if not wi:
+                continue
+            curl_config_path = tmpdir / f"curl-config-{i}.txt"
+            _gen_curl_download_config(items, curl_config_path)
+            curl_command = self.CURL_COMMAND + [
+                "--config", os.fspath(curl_config_path),
+            ]
+            workers.append(subprocess.Popen(
+                curl_command, encoding="utf-8", cwd=tmpdir))
+        return_codes = []
+        for w in workers:
+            return_codes.append(w.wait())
+        return max(return_codes)
 
     def _verify_items(self, tmpdir: pathlib.Path, items: Dict):
         for checksum, desc in items.items():
