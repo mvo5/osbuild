@@ -14,6 +14,7 @@ up the download.
 
 import concurrent.futures
 import os
+import pathlib
 import subprocess
 import sys
 import tempfile
@@ -85,6 +86,31 @@ SCHEMA = """
 }]
 """
 
+def _gen_curl_download_config(items: Dict, config_path: pathlib.Path):
+    with config_path.open("w", encoding="utf8") as fp:
+        for checksum, desc in items.items():
+            url = desc.get("url")
+            fp.write(f'url = "{url}"\n')
+            fp.write(f'output = "{checksum}"\n')
+            secrets = desc.get("secrets")
+            if secrets:
+                ssl_ca_cert = secrets.get('ssl_ca_cert')
+                if ssl_ca_cert:
+                    fp.write(f'cacert = "{ssl_ca_cert}"\n')
+                ssl_client_cert = secrets.get('ssl_client_cert')
+                if ssl_client_cert:
+                    fp.write(f'cert = "{ssl_client_cert}"\n')
+                ssl_client_key = secrets.get('ssl_client_key')
+                if ssl_client_key:
+                    fp.write(f'key = "{ssl_client_key}"\n')
+
+            insecure = desc.get("insecure")
+            if insecure:
+                fp.write(f'insecure\n')
+            else:
+                fp.write(f'no-insecure\n')
+            fp.write("\n")
+
 
 class CurlSource(sources.SourceService):
 
@@ -137,14 +163,17 @@ class CurlSource(sources.SourceService):
         curl_command.append(url)
         return curl_command
 
+    def fetch_one(self):
+        raise Exception("use fetch_all()")
+
     def fetch_all(self, items: Dict):
         # some mirrors are sometimes broken. retry manually, because we could be
         # redirected to a different, working, one on retry.
         for _ in range(10):
-            return_code = fetch_all_no_retry(items)
+            return_code = self.fetch_all_no_retry(items)
             if return_code == 0:
                 return
-        raise RuntimeError(f"curl: error downloading {url}: error code {return_code}")
+        raise RuntimeError(f"curl: error downloading {items}: error code {return_code}")
     
     def fetch_all_no_retry(self, items: Dict):
         # Download to a temporary sub cache until we have verified the checksum. Use a
@@ -152,9 +181,9 @@ class CurlSource(sources.SourceService):
         with tempfile.TemporaryDirectory(prefix="osbuild-unverified-file-", dir=self.cache) as tmpdir:
             filtered = filter(lambda i: not self.exists(i[0], i[1]), items.items())  # discards items already in cache
             transformed = map(lambda i: self.transform(i[0], i[1]), filtered)  # prepare each item to be downloaded
-            
+            for checksum, desc in items.items():
+                self._download_and_verify(tmpdir, checksum, desc)
                 
-            self._download_and_verify(tmpdir, checksum, desc)
 
     def _download_and_verify(self, tmpdir, checksum, desc):
         curl_command = [
