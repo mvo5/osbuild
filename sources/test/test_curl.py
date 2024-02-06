@@ -91,13 +91,15 @@ def test_curl_download_many_fail(patched_run, tmp_path, sources_module):
     patched_run.return_value = fake_completed_process
     # source will automatically close the socket on __del__()
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    curl = sources_module.CurlSource.from_args(["--service-fd", str(sock.fileno())])
-    curl.cache = tmp_path / "curl-cache"
-    curl.cache.mkdir(parents=True, exist_ok=True)
+    with patch.object(sources_module, "_curl_has_parallel_downloads") as mocked_cpd:
+        mocked_cpd.return_value = False
+        curl = sources_module.CurlSource.from_args(["--service-fd", str(sock.fileno())])
+        curl.cache = tmp_path / "curl-cache"
+        curl.cache.mkdir(parents=True, exist_ok=True)
 
-    with pytest.raises(RuntimeError) as exp:
-        curl.fetch_many(TEST_SOURCE_PAIRS)
-    assert str(exp.value) == 'curl error: "something bad happend": error code 91'
+        with pytest.raises(RuntimeError) as exp:
+            curl.fetch_many(TEST_SOURCE_PAIRS)
+        assert str(exp.value) == 'curl error: "something bad happend": error code 91'
 
 
 @patch("subprocess.run")
@@ -111,11 +113,13 @@ def test_curl_download_many(mocked_run, tmp_path, sources_module):
     mocked_run.side_effect = _fake_download
     # source will automatically close the socket on __del__()
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    curl = sources_module.CurlSource.from_args(["--service-fd", str(sock.fileno())])
-    curl.cache = tmp_path / "curl-cache"
-    curl.cache.mkdir(parents=True, exist_ok=True)
+    with patch.object(sources_module, "_curl_has_parallel_downloads") as mocked_cpd:
+        mocked_cpd.return_value = False
+        curl = sources_module.CurlSource.from_args(["--service-fd", str(sock.fileno())])
+        curl.cache = tmp_path / "curl-cache"
+        curl.cache.mkdir(parents=True, exist_ok=True)
 
-    curl.fetch_many(TEST_SOURCE_PAIRS)
+        curl.fetch_many(TEST_SOURCE_PAIRS)
     for desc in TEST_SOURCE_PAIRS:
         chksum = desc["checksum"]
         assert (curl.cache / chksum).exists()
