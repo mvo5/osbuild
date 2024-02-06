@@ -74,11 +74,6 @@ class SourceService(host.Service):
         """Returns True if the item to download is in cache. """
         return os.path.isfile(f"{self.cache}/{checksum}")
 
-    # pylint: disable=[no-self-use]
-    def transform(self, checksum, desc) -> Tuple:
-        """Modify the input data before downloading. By default only transforms an item object to a Tupple."""
-        return checksum, desc
-
     @staticmethod
     def load_items(fds):
         with os.fdopen(fds.steal(0)) as f:

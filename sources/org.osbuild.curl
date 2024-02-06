@@ -87,6 +87,7 @@ SCHEMA = """
 }]
 """
 
+
 def _curl_has_parallel_downloads():
     output = subprocess.check_output(["curl", "--version"], universal_newlines=True)
     m = re.match(r'^curl (\d+\.\d+\.\d+)', output.split("\n")[0])
@@ -151,6 +152,7 @@ class CurlSource(sources.SourceService):
 
     def fetch_one(self):
         raise Exception("use fetch_all()")
+
 
     def fetch_all(self, items: Dict):
         # some mirrors are sometimes broken. retry manually, because we could be
