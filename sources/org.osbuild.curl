@@ -86,9 +86,9 @@ SCHEMA = """
 }]
 """
 
-def _gen_curl_download_config(items: List, config_path: pathlib.Path):
+def _gen_curl_download_config(items: Dict, config_path: pathlib.Path):
     with config_path.open("w", encoding="utf8") as fp:
-        for checksum, desc in items:
+        for checksum, desc in items.items():
             url = desc.get("url")
             fp.write(f'url = "{url}"\n')
             fp.write(f'output = "{checksum}"\n')
@@ -116,13 +116,11 @@ class CurlSource(sources.SourceService):
 
     content_type = "org.osbuild.files"
 
-    max_workers = 2 * (os.cpu_count() or 1)
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.subscriptions = None
 
-    def transform(self, checksum, desc):
+    def transform(self, desc):
         url = desc
         if not isinstance(url, dict):
             url = {"url": url}
@@ -134,14 +132,7 @@ class CurlSource(sources.SourceService):
                 self.subscriptions = Subscriptions.from_host_system()
             url["secrets"] = self.subscriptions.get_secrets(url.get("url"))
 
-        return checksum, url
-
-    @staticmethod
-    def _quote_url(url: str) -> str:
-        purl = urllib.parse.urlparse(url)
-        path = urllib.parse.quote(purl.path)
-        quoted = purl._replace(path=path)
-        return quoted.geturl()
+        return url
 
     def fetch_one(self):
         raise Exception("use fetch_all()")
@@ -150,15 +141,19 @@ class CurlSource(sources.SourceService):
         # some mirrors are sometimes broken. retry manually, because we could be
         # redirected to a different, working, one on retry.
         for _ in range(10):
-            filtered = filter(lambda i: not self.exists(i[0], i[1]), items.items())  # discards items already in cache
-            transformed = list(map(lambda i: self.transform(i[0], i[1]), filtered))
+            # discards items already in cache
+            filtered = {chksum: desc for chksum, desc in items.items()
+                        if not self.exists(chksum, desc)}
+            # amend items with security/subscription information
+            transformed = {chksum: self.transform(desc)
+                           for chksum, desc in filtered.items()}
             if len(transformed) == 0:
                 break
             return_code = self.fetch_all_no_retry(transformed)
         else:
             raise RuntimeError(f"curl: error downloading {transformed}: error code {return_code}")
     
-    def fetch_all_no_retry(self, items: List):
+    def fetch_all_no_retry(self, items: Dict):
         # Download to a temporary sub cache until we have verified the checksum. Use a
         # subdirectory, so we avoid copying across block devices.
         with tempfile.TemporaryDirectory(prefix="osbuild-unverified-file-", dir=self.cache) as tmpdir:
@@ -167,7 +162,7 @@ class CurlSource(sources.SourceService):
             self._verify_items(tmpdir, items)
         return return_code
 
-    def _download_items(self, tmpdir: pathlib.Path, items: List):
+    def _download_items(self, tmpdir: pathlib.Path, items: Dict):
         curl_config_path = tmpdir / "curl-config.txt"
         _gen_curl_download_config(items, curl_config_path)
         # TODO: add --parallel here with new enough curl
@@ -180,13 +175,12 @@ class CurlSource(sources.SourceService):
             "--location",
             "--config", os.fspath(curl_config_path),
         ]
-        print(curl_command)
         curl = subprocess.run(
             curl_command, encoding="utf-8", cwd=tmpdir, check=False)
         return curl.returncode
 
     def _verify_items(self, tmpdir: pathlib.Path, items: Dict):
-        for checksum, desc in items:
+        for checksum, desc in items.items():
             downloaded_path = tmpdir / checksum
             if not downloaded_path.exists():
                 continue
