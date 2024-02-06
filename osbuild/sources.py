@@ -94,10 +94,6 @@ class SourceService(host.Service):
         self.tmpdir = None
 
     @abc.abstractmethod
-    def fetch_one(self, checksum, desc) -> None:
-        """Performs the actual fetch of an element described by its checksum and its descriptor"""
-
-    @abc.abstractmethod
     def fetch_all(self, items: Dict) -> None:
         """Fetch all sources."""
 
