@@ -21,6 +21,7 @@ import os
 import sys
 
 from osbuild import inputs
+from osbuild.util import containers
 from osbuild.util.mnt import MountGuard
 
 SCHEMA = r"""
@@ -33,6 +34,22 @@ SCHEMA = r"""
       "name": {
         "type": "string",
         "description": "The name to use for the image"
+      }
+    }
+  },
+  "source-storage-options": {
+    "type": "object",
+    "required": ["name"],
+    "additionalProperties": false,
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "The name to use for the image"
+      },
+      "input-type": {
+        "type": "string",
+        "description": "the input type of the container",
+        "enum": ["org.osbuild.containers-storage"]
       }
     }
   },
@@ -60,6 +77,16 @@ SCHEMA = r"""
         "options": {
           "$ref": "#/definitions/source-options"
         }
+      }
+    }
+  },
+  "source-storage-ref": {
+    "type": "object",
+    "additionalProperties": false,
+    "minProperties": 1,
+    "patternProperties": {
+      ".*": {
+        "$ref": "#/definitions/source-storage-options"
       }
     }
   },
@@ -129,7 +156,8 @@ SCHEMA = r"""
         "description": "Container image id",
          "oneOf": [
           {"$ref": "#/definitions/source-array-ref"},
-          {"$ref": "#/definitions/source-object-ref"}
+          {"$ref": "#/definitions/source-object-ref"},
+          {"$ref": "#/definitions/source-storage-ref"}
         ]
       }
     }
@@ -163,6 +191,21 @@ class ContainersInput(inputs.InputService):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.mg = MountGuard()
+        self.storage_conf = None
+
+    def map_storage_ref(self, _source, ref, target):
+        if self.storage_conf is None:
+            # only read the host once
+            self.storage_conf = containers.get_host_storage()
+
+        source = self.storage_conf["storage"]["graphroot"]
+        dest = os.path.join(target, "storage")
+
+        # bind mount the input directory to the destination
+        os.makedirs(dest, exist_ok=True)
+        self.mg.mount(source, dest)
+
+        return ref, "containers-storage"
 
     def map_source_ref(self, source, ref, target):
         source_archive = os.path.join(source, ref, "image")
@@ -196,7 +239,15 @@ class ContainersInput(inputs.InputService):
 
         for ref, data in refs.items():
             if origin == "org.osbuild.source":
-                ref, container_format = self.map_source_ref(source, ref, target)
+                # We use a `type` flag on the input so that we can differentiate between containers that
+                # are copied into the store and containers that are coming from the host's containers-storage.
+                # This will require the `toml` package in the buildroot. Alternatively, we could resolve the
+                # storage config by reading the host at the point of manifest generation.
+                input_type = data.get("input-type")
+                if input_type is not None:
+                    ref, container_format = self.map_storage_ref(source, ref, target)
+                else:
+                    ref, container_format = self.map_source_ref(source, ref, target)
             else:
                 ref, container_format = self.map_pipeline_ref(store, ref, target)
 
@@ -206,12 +257,16 @@ class ContainersInput(inputs.InputService):
             }
             images[ref]["name"] = data["name"]
 
+            if container_format == "containers-storage" and self.storage_conf is not None:
+                images[ref]["storage"] = self.storage_conf["storage"]
+
         reply = {
             "path": target,
             "data": {
                 "archives": images
             }
         }
+
         return reply
 
     def unmap(self):
