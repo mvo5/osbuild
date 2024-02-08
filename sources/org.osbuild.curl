@@ -160,6 +160,7 @@ class CurlSource(sources.SourceService):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.subscriptions = None
+        self._parallel_downloads = _curl_has_parallel_downloads()
 
     def transform(self, checksum: str, desc: Dict) -> Dict:
         """transform takes a checksum, desc and returns a single dict
@@ -196,7 +197,10 @@ class CurlSource(sources.SourceService):
         # and secrets to each download item
         transformed = map(lambda i: self.transform(i[0], i[1]), filtered)
 
-        if _curl_has_parallel_downloads():
+        if self._parallel_downloads:
+            # this number is a bit arbitrary, curl seems to be doing a really
+            # good job with --parallel so a high number here seems to be
+            # unnecessary
             max_workers = 2
         else:
             max_workers = 2 * (os.cpu_count() or 1)
