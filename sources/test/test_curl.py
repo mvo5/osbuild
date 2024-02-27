@@ -1,13 +1,13 @@
 #!/usr/bin/python3
 
 import pathlib
-import socket
 import subprocess
 import textwrap
 from unittest.mock import patch
 
 import pytest
 
+from osbuild import testutil
 from osbuild.util.checksum import verify_file
 
 SOURCES_NAME = "org.osbuild.curl"
@@ -89,11 +89,10 @@ def test_curl_download_many_fail(patched_run, tmp_path, sources_module):
     fake_completed_process.stderr = "something bad happend"
 
     patched_run.return_value = fake_completed_process
-    # source will automatically close the socket on __del__()
-    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    fd = testutil.make_fake_service_fd()
     with patch.object(sources_module, "curl_has_parallel_downloads") as mocked_cpd:
         mocked_cpd.return_value = False
-        curl = sources_module.CurlSource.from_args(["--service-fd", str(sock.fileno())])
+        curl = sources_module.CurlSource.from_args(["--service-fd", str(fd)])
         curl.cache = tmp_path / "curl-cache"
         curl.cache.mkdir(parents=True, exist_ok=True)
 
@@ -112,11 +111,10 @@ def test_curl_download_many(mocked_run, tmp_path, sources_module, curl_parallel)
             (download_dir / chksum).write_text(desc["url"][-1], encoding="utf8")
         return subprocess.CompletedProcess(args, 0)
     mocked_run.side_effect = _fake_download
-    # source will automatically close the socket on __del__()
-    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    fd = testutil.make_fake_service_fd()
     with patch.object(sources_module, "curl_has_parallel_downloads") as mocked_cpd:
         mocked_cpd.return_value = curl_parallel
-        curl = sources_module.CurlSource.from_args(["--service-fd", str(sock.fileno())])
+        curl = sources_module.CurlSource.from_args(["--service-fd", str(fd)])
         curl.cache = tmp_path / "curl-cache"
         curl.cache.mkdir(parents=True, exist_ok=True)
 
