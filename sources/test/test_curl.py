@@ -91,7 +91,7 @@ def test_curl_download_many_fail(patched_run, tmp_path, sources_module):
     patched_run.return_value = fake_completed_process
     # source will automatically close the socket on __del__()
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    with patch.object(sources_module, "_curl_has_parallel_downloads") as mocked_cpd:
+    with patch.object(sources_module, "curl_has_parallel_downloads") as mocked_cpd:
         mocked_cpd.return_value = False
         curl = sources_module.CurlSource.from_args(["--service-fd", str(sock.fileno())])
         curl.cache = tmp_path / "curl-cache"
@@ -102,8 +102,9 @@ def test_curl_download_many_fail(patched_run, tmp_path, sources_module):
         assert str(exp.value) == 'curl error: "something bad happend": error code 91'
 
 
+@pytest.mark.parametrize("curl_parallel", [True, False])
 @patch("subprocess.run")
-def test_curl_download_many(mocked_run, tmp_path, sources_module):
+def test_curl_download_many(mocked_run, tmp_path, sources_module, curl_parallel):
     def _fake_download(*args, **kwargs):
         download_dir = pathlib.Path(kwargs["cwd"])
         for desc in TEST_SOURCE_PAIRS:
@@ -113,8 +114,8 @@ def test_curl_download_many(mocked_run, tmp_path, sources_module):
     mocked_run.side_effect = _fake_download
     # source will automatically close the socket on __del__()
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    with patch.object(sources_module, "_curl_has_parallel_downloads") as mocked_cpd:
-        mocked_cpd.return_value = False
+    with patch.object(sources_module, "curl_has_parallel_downloads") as mocked_cpd:
+        mocked_cpd.return_value = curl_parallel
         curl = sources_module.CurlSource.from_args(["--service-fd", str(sock.fileno())])
         curl.cache = tmp_path / "curl-cache"
         curl.cache.mkdir(parents=True, exist_ok=True)
@@ -124,3 +125,33 @@ def test_curl_download_many(mocked_run, tmp_path, sources_module):
         chksum = desc["checksum"]
         assert (curl.cache / chksum).exists()
         assert verify_file(curl.cache / chksum, chksum)
+    # check that --parallel is used
+    assert len(mocked_run.call_args_list) == 1
+    args, _ = mocked_run.call_args_list[0]
+    assert ("--parallel" in args[0]) == curl_parallel
+
+
+# fc39
+NEW_CURL_OUTPUT = """\
+curl 8.2.1 (x86_64-redhat-linux-gnu) libcurl/8.2.1 OpenSSL/3.1.1 zlib/1.2.13 libidn2/2.3.7 nghttp2/1.55.1
+Release-Date: 2023-07-26
+Protocols: file ftp ftps http https
+Features: alt-svc AsynchDNS GSS-API HSTS HTTP2 HTTPS-proxy IDN IPv6 Kerberos Largefile libz SPNEGO SSL threadsafe UnixSockets
+"""
+
+# centos-stream8
+OLD_CURL_OUTPUT = """\
+curl 7.61.1 (x86_64-redhat-linux-gnu) libcurl/7.61.1 OpenSSL/1.1.1k zlib/1.2.11 nghttp2/1.33.0
+Release-Date: 2018-09-05
+Protocols: dict file ftp ftps gopher http https imap imaps pop3 pop3s rtsp smb smbs smtp smtps telnet tftp
+Features: AsynchDNS IPv6 Largefile GSS-API Kerberos SPNEGO NTLM NTLM_WB SSL libz TLS-SRP HTTP2 UnixSockets HTTPS-proxy
+"""
+
+
+@patch("subprocess.check_output")
+def test_curl_has_parallel_download(mocked_check_output, sources_module):
+    mocked_check_output.return_value = NEW_CURL_OUTPUT
+    assert sources_module.curl_has_parallel_downloads()
+
+    mocked_check_output.return_value = OLD_CURL_OUTPUT
+    assert not sources_module.curl_has_parallel_downloads()

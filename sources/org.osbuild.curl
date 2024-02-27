@@ -94,7 +94,7 @@ SCHEMA = """
 """
 
 
-def _curl_has_parallel_downloads():
+def curl_has_parallel_downloads():
     output = subprocess.check_output(["curl", "--version"], universal_newlines=True)
     first_line = output.split("\n", maxsplit=1)[0]
     m = re.match(r'^curl (\d+\.\d+\.\d+)', first_line)
@@ -160,7 +160,7 @@ class CurlSource(sources.SourceService):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.subscriptions = None
-        self._parallel_downloads = _curl_has_parallel_downloads()
+        self._parallel_downloads = curl_has_parallel_downloads()
 
     def transform(self, checksum: str, desc: Dict) -> Dict:
         """transform takes a checksum, desc and returns a single dict
@@ -210,7 +210,8 @@ class CurlSource(sources.SourceService):
 
         # we could use "curl --parallel" for newer versions of curl
         # (7.68+) instead of this threading stuff but that is not
-        # available on RHEL8 yet
+        # available on RHEL8 yet, once this is no longer supported
+        # just switch to --parallel here
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             for _ in executor.map(self.fetch_many, per_worker_items):
                 pass
@@ -234,7 +235,7 @@ class CurlSource(sources.SourceService):
                     "--location",
                     "--config", curl_config_path,
                 ]
-                if _curl_has_parallel_downloads():
+                if curl_has_parallel_downloads():
                     curl_command.append("--parallel")
                 curl = subprocess.run(curl_command, encoding="utf-8", cwd=tmpdir, check=False)
                 return_code = curl.returncode
