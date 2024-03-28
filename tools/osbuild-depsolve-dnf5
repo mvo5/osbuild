@@ -157,6 +157,22 @@ class Solver():
                 self._dnfrepo(repo, exclude_pkgs)
 
             if root_dir:
+                # This sets the varsdir to ("{root_dir}/usr/share/dnf5/vars.d/", "{root_dir}/etc/dnf/vars/") for custom
+                # variable substitution (e.g. CentOS Stream 9's $stream variable)
+                conf.installroot = root_dir
+                conf.varsdir = (os.path.join(root_dir, "etc/dnf/vars"), os.path.join(root_dir, "usr/share/dnf5/vars.d"))
+
+                # NOTE: No combination of varsdir and installroot seems to be doing what we expect (see
+                # osbuild-depsolve-dnf and tests). Read them manually for now until we fix this.
+                for path in conf.get_varsdir_option().get_value():
+                    if not os.path.exists(path):
+                        continue
+                    for file in os.listdir(path):
+                        filepath = os.path.join(path, file)
+                        with open(filepath, "r", encoding="utf-8") as varfile:
+                            value = varfile.read().rstrip("\n")
+                        self.base.get_vars().set(file, value)
+
                 repos_dir = os.path.join(root_dir, "etc/yum.repos.d")
                 self.base.get_repo_sack().create_repos_from_dir(repos_dir)
 
