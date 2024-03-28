@@ -249,4 +249,6 @@ def test_depsolve_dnf5(repo_servers, test_case, cache_dir):
 
     for repo_configs, repos_dir in config_combos(repo_servers):
         res = depsolve(pks, repo_configs, repos_dir, cache_dir, "./tools/osbuild-depsolve-dnf5")
-        assert {pkg["name"] for pkg in res} == test_case["results"]
+        assert {pkg["name"] for pkg in res["packages"]} == test_case["results"]
+        for repo in res["repos"].values():
+            assert repo["gpgkeys"] == [TEST_KEY]
