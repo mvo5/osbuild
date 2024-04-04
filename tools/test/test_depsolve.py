@@ -235,24 +235,24 @@ def cache_dir_fixture(tmpdir_factory):
     return str(tmpdir_factory.mktemp("cache"))
 
 
-@pytest.mark.parametrize("test_case", test_cases)
-def test_depsolve(repo_servers, test_case, cache_dir):
+def _test_depsolve_both_dnf_dnf5(command, repo_servers, test_case, cache_dir):
     pks = test_case["packages"]
 
     for repo_configs, root_dir in config_combos(repo_servers):
-        res = depsolve(pks, repo_configs, root_dir, cache_dir, "./tools/osbuild-depsolve-dnf")
+        res = depsolve(pks, repo_configs, root_dir, cache_dir, command)
         assert {pkg["name"] for pkg in res["packages"]} == test_case["results"]
         for repo in res["repos"].values():
             assert repo["gpgkeys"] == [TEST_KEY]
+
+
+@pytest.mark.parametrize("test_case", test_cases)
+def test_depsolve(repo_servers, test_case, cache_dir):
+    command = "./tools/osbuild-depsolve-dnf"
+    _test_depsolve_both_dnf_dnf5(command, repo_servers, test_case, cache_dir)
 
 
 @pytest.mark.skipif(not has_dnf5(), reason="libdnf5 not available")
 @pytest.mark.parametrize("test_case", test_cases)
 def test_depsolve_dnf5(repo_servers, test_case, cache_dir):
-    pks = test_case["packages"]
-
-    for repo_configs, repos_dir in config_combos(repo_servers):
-        res = depsolve(pks, repo_configs, repos_dir, cache_dir, "./tools/osbuild-depsolve-dnf5")
-        assert {pkg["name"] for pkg in res["packages"]} == test_case["results"]
-        for repo in res["repos"].values():
-            assert repo["gpgkeys"] == [TEST_KEY]
+    command = "./tools/osbuild-depsolve-dnf5"
+    _test_depsolve_both_dnf_dnf5(command, repo_servers, test_case, cache_dir)
