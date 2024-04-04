@@ -23,6 +23,11 @@ import hawkey
 
 class Solver():
 
+    # XXX: Solver now needs to know about "request": I feel a bit
+    # uneasy about this change, so far Solver() did not know about
+    # requests this was handled at a different layer. Now it needs to
+    # know details about it, i.e. what parameters request may have and
+    # which are optional. No great idea though.
     def __init__(self, request, persistdir, cache_dir):
         arch = request["arch"]
         releasever = request.get("releasever")
