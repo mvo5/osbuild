@@ -22,6 +22,18 @@ def has_dnf5():
     return bool(importlib.util.find_spec("libdnf5"))
 
 
+# XXX: super nitpick^:googol:) sorry, I'm sure I'm annoying at this
+# point :( I wonder if tweaking the order of the arguments might make
+# sense? There is no real standard here and it's super subjective so
+# feel free to stop reading here :)
+#
+#My thinking is mostly that typically "more static" things come first,
+#then the more changing things. e.g. in golang typically each thing
+#that takes a context takes it first. Here that might be:
+#
+#    def depsolve(root_dir, cache_dir, command, repos, pkgs):
+#
+#but I'm probably totally overthing it, probably best to ignore me here
 def depsolve(pkgs, repos, root_dir, cache_dir, command):
     req = {
         "command": "depsolve",
