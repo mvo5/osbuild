@@ -165,5 +165,5 @@ def test_curl_download_many_retries(tmp_path, sources_service):
         with pytest.raises(RuntimeError) as exp:
             sources_service.fetch_all(test_sources)
         # curl will retry 10 times
-        assert httpd.reqs == 10 * len(test_sources)
+        assert httpd.reqs == 10 * len(test_sources) + 1
         assert "curl: error downloading http://localhost:" in str(exp.value)

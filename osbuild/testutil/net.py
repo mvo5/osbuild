@@ -5,7 +5,20 @@ network related utilities
 import contextlib
 import http.server
 import socket
+import time
 import threading
+
+def wait_port_ready(address, port, sleep=1, max_wait_sec=30):
+    for i in range(int(max_wait_sec / sleep)):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(sleep)
+            try:
+                s.connect((address, port))
+                return
+            except (ConnectionRefusedError, ConnectionResetError, TimeoutError) as e:
+                pass
+            time.sleep(sleep)
+    raise ConnectionRefusedError(f"cannot connect to port {port} after {max_wait_sec}s")
 
 
 def _get_free_port():
@@ -47,6 +60,7 @@ def http_serve_directory(rootdir, simulate_failures=0):
         simulate_failures=simulate_failures,
     )
     threading.Thread(target=httpd.serve_forever).start()
+    wait_port_ready("localhost", port)
     try:
         yield httpd
     finally:
