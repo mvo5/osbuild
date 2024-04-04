@@ -175,8 +175,32 @@ test_cases = [
     },
 ]
 
+def make_dnf_scafolding(base_dir):
+    root_dir = TemporaryDirectory(dir=base_dir).name
+    repos_dir = os.path.join(root_dir, "etc/yum.repos.d")
+    os.makedirs(repos_dir)
+    keys_dir = os.path.join(root_dir, "etc/pki/rpm-gpg")
+    os.makedirs(keys_dir)
+    vars_dir = os.path.join(root_dir, "etc/dnf/vars")
+    os.makedirs(vars_dir)
+ 
+    # Use the gpgkey to test both the key reading and the variable substitution.
+    # For this test, it doesn't need to be a real key.
+    key_url = "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-$releasever-$basearch-$customvar"
 
-def enum_repo_configs(servers):
+    customvar = "test-customvar"
+    key_path = os.path.join(keys_dir, f"RPM-GPG-KEY-9-x86_64-{customvar}")
+    with open(key_path, "w", encoding="utf-8") as key_file:
+        key_file.write(TEST_KEY)
+
+    vars_path = os.path.join(vars_dir, "customvar")
+    with open(vars_path, "w", encoding="utf-8") as vars_file:
+        vars_file.write(customvar)
+
+    return root_dir, repos_dir, key_url
+
+
+def enum_repo_configs(tmp_path, servers):
     """
     Return all configurations for the provided repositories, either as config files in a directory or as repository
     configs in the depsolve request, or a combination of both.
@@ -201,45 +225,25 @@ def enum_repo_configs(servers):
                 "rhsm": False,
                 "gpgkeys": [TEST_KEY],
             })
-        with TemporaryDirectory() as root_dir:
-            repos_dir = os.path.join(root_dir, "etc/yum.repos.d")
-            os.makedirs(repos_dir)
-            keys_dir = os.path.join(root_dir, "etc/pki/rpm-gpg")
-            os.makedirs(keys_dir)
-            vars_dir = os.path.join(root_dir, "etc/dnf/vars")
-            os.makedirs(vars_dir)
+        root_dir, repos_dir, key_url = make_dnf_scafolding(tmp_path)    
+        for idx in combo[1]:  # servers to be configured through root_dir
+            server = servers[idx]
+            parser = configparser.ConfigParser()
+            name = server["name"]
+            parser.add_section(name)
+            # Set some options in a specific order in which they tend to be
+            # written in repo files.
+            parser.set(name, "name", name)
+            parser.set(name, "baseurl", server["address"])
+            parser.set(name, "enabled", "1")
+            parser.set(name, "gpgcheck", "1")
+            parser.set(name, "sslverify", "0")
+            parser.set(name, "gpgkey", key_url)
+            
+            with open(f"{repos_dir}/{name}.repo", "w", encoding="utf-8") as repo_file:
+                parser.write(repo_file, space_around_delimiters=False)
 
-            # Use the gpgkey to test both the key reading and the variable substitution.
-            # For this test, it doesn't need to be a real key.
-            key_url = "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-$releasever-$basearch-$customvar"
-
-            customvar = "test-customvar"
-            key_path = os.path.join(keys_dir, f"RPM-GPG-KEY-9-x86_64-{customvar}")
-            with open(key_path, "w", encoding="utf-8") as key_file:
-                key_file.write(TEST_KEY)
-
-            vars_path = os.path.join(vars_dir, "customvar")
-            with open(vars_path, "w", encoding="utf-8") as vars_file:
-                vars_file.write(customvar)
-
-            for idx in combo[1]:  # servers to be configured through root_dir
-                server = servers[idx]
-                parser = configparser.ConfigParser()
-                name = server["name"]
-                parser.add_section(name)
-                # Set some options in a specific order in which they tend to be
-                # written in repo files.
-                parser.set(name, "name", name)
-                parser.set(name, "baseurl", server["address"])
-                parser.set(name, "enabled", "1")
-                parser.set(name, "gpgcheck", "1")
-                parser.set(name, "sslverify", "0")
-                parser.set(name, "gpgkey", key_url)
-
-                with open(f"{repos_dir}/{name}.repo", "w", encoding="utf-8") as repo_file:
-                    parser.write(repo_file, space_around_delimiters=False)
-
-            yield repo_configs, root_dir
+        yield repo_configs, root_dir
 
 
 @pytest.fixture(name="cache_dir", scope="session")
@@ -247,10 +251,10 @@ def cache_dir_fixture(tmpdir_factory):
     return str(tmpdir_factory.mktemp("cache"))
 
 
-def _test_depsolve_both_dnf_dnf5(command, repo_servers, test_case, cache_dir):
+def _test_depsolve_both_dnf_dnf5(tmp_path, command, repo_servers, test_case, cache_dir):
     pks = test_case["packages"]
 
-    for repo_configs, root_dir in enum_repo_configs(repo_servers):
+    for repo_configs, root_dir in enum_repo_configs(tmp_path, repo_servers):
         res = depsolve(pks, repo_configs, root_dir, cache_dir, command)
         assert {pkg["name"] for pkg in res["packages"]} == test_case["results"]
         for repo in res["repos"].values():
@@ -258,13 +262,13 @@ def _test_depsolve_both_dnf_dnf5(command, repo_servers, test_case, cache_dir):
 
 
 @pytest.mark.parametrize("test_case", test_cases)
-def test_depsolve(repo_servers, test_case, cache_dir):
+def test_depsolve(tmp_path, repo_servers, test_case, cache_dir):
     command = "./tools/osbuild-depsolve-dnf"
-    _test_depsolve_both_dnf_dnf5(command, repo_servers, test_case, cache_dir)
+    _test_depsolve_both_dnf_dnf5(tmp_path, command, repo_servers, test_case, cache_dir)
 
 
 @pytest.mark.skipif(not has_dnf5(), reason="libdnf5 not available")
 @pytest.mark.parametrize("test_case", test_cases)
-def test_depsolve_dnf5(repo_servers, test_case, cache_dir):
+def test_depsolve_dnf5(tmp_path, repo_servers, test_case, cache_dir):
     command = "./tools/osbuild-depsolve-dnf5"
-    _test_depsolve_both_dnf_dnf5(command, repo_servers, test_case, cache_dir)
+    _test_depsolve_both_dnf_dnf5(tmp_path, command, repo_servers, test_case, cache_dir)
