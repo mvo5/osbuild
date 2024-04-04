@@ -213,14 +213,14 @@ def enum_repo_configs(servers):
             # For this test, it doesn't need to be a real key.
             key_url = "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-$releasever-$basearch-$customvar"
 
-            # customvar = "test"
-            key_path = os.path.join(keys_dir, "RPM-GPG-KEY-9-x86_64-test")
+            customvar = "test-customvar"
+            key_path = os.path.join(keys_dir, f"RPM-GPG-KEY-9-x86_64-{customvar}")
             with open(key_path, "w", encoding="utf-8") as key_file:
                 key_file.write(TEST_KEY)
 
             vars_path = os.path.join(vars_dir, "customvar")
             with open(vars_path, "w", encoding="utf-8") as vars_file:
-                vars_file.write("test")
+                vars_file.write(customvar)
 
             for idx in combo[1]:  # servers to be configured through root_dir
                 server = servers[idx]
