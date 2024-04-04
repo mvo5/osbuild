@@ -64,6 +64,11 @@ def repo_servers_fixture():
         p.kill()
 
 
+# XXX: try a more pytest-ish pattern: (idle rambling) pytest seems to
+# encourage a pattern like input, expected for the paramterization,
+# but of course the test cases would have to change to become
+# pairs. Then the test cases are harder to read so it's a bit of a
+# wash but I wanted to mention it as I was thinking about it :)
 test_cases = [
     {
         "packages": ["filesystem"],
