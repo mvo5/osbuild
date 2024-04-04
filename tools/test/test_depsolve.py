@@ -176,7 +176,7 @@ test_cases = [
 ]
 
 
-def config_combos(servers):
+def enum_repo_configs(servers):
     """
     Return all configurations for the provided repositories, either as config files in a directory or as repository
     configs in the depsolve request, or a combination of both.
@@ -250,7 +250,7 @@ def cache_dir_fixture(tmpdir_factory):
 def _test_depsolve_both_dnf_dnf5(command, repo_servers, test_case, cache_dir):
     pks = test_case["packages"]
 
-    for repo_configs, root_dir in config_combos(repo_servers):
+    for repo_configs, root_dir in enum_repo_configs(repo_servers):
         res = depsolve(pks, repo_configs, root_dir, cache_dir, command)
         assert {pkg["name"] for pkg in res["packages"]} == test_case["results"]
         for repo in res["repos"].values():
