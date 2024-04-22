@@ -18,7 +18,6 @@ jobs:
       fail-fast: false
       matrix:
         test:
-          - parallel
           - normal
         environment:
           - "py36"    # RH8
@@ -45,22 +44,6 @@ jobs:
               # test_assemblers.py is run below
               TEST_CATEGORY="not test_stages.py and not test_assemblers.py"
           fi
+          PYTHONVERBOSE=1 \
           OSBUILD_TEST_STORE="${{ env.OSBUILD_TEST_STORE }}" \
           tox -e "${{ matrix.environment }}" -- $TEST_WORKERS -k "$TEST_CATEGORY"
-
-  v1_manifests:
-    name: "Assembler test (legacy)"
-    runs-on: ubuntu-latest
-    steps:
-      - name: "Clone Repository"
-        uses: actions/checkout@v4
-      - name: "Run"
-        uses: osbuild/containers/src/actions/privdocker@552e30cf1b4ed19c6ddaa57f96c342b3dff4227b
-        env:
-          # Using 4 workers is a bit arbitrary, "auto" is probably too aggressive.
-          TEST_WORKERS: "-n 4"
-        with:
-          image: ghcr.io/osbuild/osbuild-ci:latest-202308241910
-          run: |
-            OSBUILD_TEST_STORE="${{ env.OSBUILD_TEST_STORE }}" \
-            tox -e "py36" -- ${{ env.TEST_WORKERS }} test.run.test_assemblers
