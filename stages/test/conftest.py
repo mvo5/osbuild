@@ -19,7 +19,7 @@ def stage_module(request: pytest.FixtureRequest) -> ModuleType:
     stage_name = request.module.STAGE_NAME
     caller_dir = pathlib.Path(request.node.fspath).parent
     module_path = caller_dir.parent / stage_name
-    return import_module_from_path("stage", os.fspath(module_path))
+    return import_module_from_path(stage_name, os.fspath(module_path))
 
 
 @pytest.fixture
