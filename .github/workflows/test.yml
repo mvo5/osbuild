@@ -55,7 +55,7 @@ jobs:
               fi
           fi
           OSBUILD_TEST_STORE="${{ env.OSBUILD_TEST_STORE }}" \
-          tox -e "${{ matrix.environment }}" $TOX_ARGS -- -rs $TEST_WORKERS -k "$TEST_CATEGORY"
+          tox -e "${{ matrix.environment }}" $TOX_ARGS -- -rs $TEST_WORKERS -k "$TEST_CATEGORY" --error-on-skip -k "not test_selinux"
 
   v1_manifests:
     name: "Assembler test (legacy)"
