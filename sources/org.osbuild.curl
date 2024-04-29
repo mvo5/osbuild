@@ -19,6 +19,7 @@ up the download.
 """
 
 import concurrent.futures
+import re
 import os
 import subprocess
 import sys
@@ -90,6 +91,21 @@ SCHEMA = """
   "required": ["urls"]
 }]
 """
+
+
+def curl_has_parallel_downloads():
+    output = subprocess.check_output(["curl", "--version"], universal_newlines=True)
+    first_line = output.split("\n", maxsplit=1)[0]
+    m = re.match(r'^curl (\d+\.\d+\.\d+)', first_line)
+    if not m:
+        print(f"WARNING: cannot parse curl version from '{first_line}'")
+        return False
+    major, minor, _ = m.group(1).split(".")
+    if int(major) > 7:
+        return True
+    if int(major) == 7 and int(minor) >= 68:
+        return True
+    return False
 
 
 class CurlSource(sources.SourceService):
