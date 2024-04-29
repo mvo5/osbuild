@@ -116,7 +116,7 @@ def _quote_url(url: str) -> str:
     return quoted.geturl()
 
 
-def _gen_curl_download_config(chksum_desc_tuple: List[Tuple[str, Dict]], config_path: pathlib.Path):
+def _gen_curl_download_config(config_path: pathlib.Path, chksum_desc_tuple: List[Tuple[str, Dict]]):
     with open(config_path, "w", encoding="utf8") as fp:
         for checksum, desc in chksum_desc_tuple:
             url = _quote_url(desc.get("url"))
@@ -140,6 +140,24 @@ def _gen_curl_download_config(chksum_desc_tuple: List[Tuple[str, Dict]], config_
                 fp.write('no-insecure\n')
             fp.write("\n")
 
+
+def _build_curl_command(tmpdir, amended):
+    curl_config_path = pathlib.Path(tmpdir) / "curl-config.txt"
+    _gen_curl_download_config(curl_config_path, amended)
+    curl_command = [
+        "curl",
+        "--silent",
+        "--speed-limit", "1000",
+        "--connect-timeout", "30",
+        "--fail",
+        "--location",
+        "--config", curl_config_path,
+    ]
+    proxy = os.getenv("OSBUILD_SOURCES_CURL_PROXY")
+    if proxy:
+        curl_command.extend(["--proxy", proxy])
+    return curl_command
+            
 
 class CurlSource(sources.SourceService):
 
@@ -180,8 +198,34 @@ class CurlSource(sources.SourceService):
         filtered = filter(lambda i: not self.exists(i[0], i[1]), items.items())  # discards items already in cache
         amended = map(lambda i: self.amend_secrets(i[0], i[1]), filtered)
 
+        self._fetch_all_old_curl(amended)
+
+    def _fetch_all_old_curl(self, amended):
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             for _ in executor.map(self.fetch_one, *zip(*amended)):
+                pass
+
+    # XXX: this needs a test that validates that files get correctly
+    # removed from the "items" list once verified so we don't donwload
+    # twice and that on failure we still error in the right way
+    def _move_done_and_update_items(self, tmpdir, items_to_fetch):
+        for checksum, desc in items_to_fetch[:]:
+            fpath = pathlib.Path(tmpdir) / f"{checksum}"
+            # some files may not yet be available when --parallel is used, that
+            # is okay
+            if not fpath.exists():
+                continue
+            if not verify_file(fpath, checksum):
+                raise RuntimeError(f"checksum mismatch: {checksum} {desc['url']}")
+            # remove from items to fetch
+            items_to_fetch.remove((checksum,desc))
+
+            # The checksum has been verified, move the file into place. in case we race
+            # another download of the same file, we simply ignore the error as their
+            # contents are guaranteed to be  the same.
+            try:
+                os.rename(f"{tmpdir}/{checksum}", f"{self.cache}/{checksum}")
+            except FileExistsError:
                 pass
 
     def fetch_one(self, checksum, desc):
@@ -192,38 +236,15 @@ class CurlSource(sources.SourceService):
             # redirected to a different, working, one on retry.
             return_code = 0
             for _ in range(10):
-                curl_config_path = f"{tmpdir}/curl-config.txt"
-                _gen_curl_download_config([(checksum, desc)], curl_config_path)
-                curl_command = [
-                    "curl",
-                    "--silent",
-                    "--speed-limit", "1000",
-                    "--connect-timeout", "30",
-                    "--fail",
-                    "--location",
-                    "--output", checksum,
-                    "--config", curl_config_path,
-                ]
-                proxy = os.getenv("OSBUILD_SOURCES_CURL_PROXY")
-                if proxy:
-                    curl_command.extend(["--proxy", proxy])
+                curl_command = _build_curl_command(tmpdir, [(checksum, desc)])
                 curl = subprocess.run(curl_command, encoding="utf-8", cwd=tmpdir, check=False)
+                self._move_done_and_update_items(tmpdir, [(checksum, desc)])
                 return_code = curl.returncode
                 if return_code == 0:
                     break
             else:
                 raise RuntimeError(f"curl: error downloading {desc['url']}: error code {return_code}")
 
-            if not verify_file(f"{tmpdir}/{checksum}", checksum):
-                raise RuntimeError(f"checksum mismatch: {checksum} {desc['url']}")
-
-            # The checksum has been verified, move the file into place. in case we race
-            # another download of the same file, we simply ignore the error as their
-            # contents are guaranteed to be  the same.
-            try:
-                os.rename(f"{tmpdir}/{checksum}", f"{self.cache}/{checksum}")
-            except FileExistsError:
-                pass
             # Workaround the lack of structured progress reporting from
             # stages/sources. It generates messages of the form
             #   "message": "source/org.osbuild.curl (org.osbuild.curl): Downloaded https://rpmrepo.osbuild.org/v2/mirror/public/f38/f38-x86_64-fedora-20230413/Packages/f/fonts-srpm-macros-2.0.5-11.fc38.noarch.rpm\n
