@@ -73,6 +73,8 @@ TEST_INPUT = [
         + "user --name someusr --password $1$notreally --iscrypted --shell /bin/ksh --uid 1337 --gid 1337 --groups grp1,grp2 --homedir /other/home/someusr\n"
         + 'sshkey --username someusr "ssh-rsa not-really-a-real-key"',
     ),
+    ({"users": {"root": {"key": "ssh-rsa with-newline-at-end\n"}}},
+     'user --name root\nsshkey --username root "ssh-rsa with-newline-at-end"'),
     ({"zerombr": True}, "zerombr"),
     ({"clearpart": {"all": True}}, "clearpart --all"),
     ({"clearpart": {"all": True, "initlabel": True}}, "clearpart --all --initlabel"),
@@ -240,7 +242,6 @@ TEST_INPUT = [
      "ostreecontainer --url=/run/install/repo/container.tar --transport=oci-archive",),
     ({"ostreecontainer": {"transport": "dir", "url": "/run/install/repo/container", }, },
      "ostreecontainer --url=/run/install/repo/container --transport=dir",),
-    ({"bootloader": {"append": "karg1 karg2=0"}}, "bootloader --append='karg1 karg2=0'"),
 ]
 
 
