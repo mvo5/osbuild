@@ -117,7 +117,7 @@ def export(checksums, cache, output):
 
 class OSTreeInput(inputs.InputService):
 
-    def map(self, store, origin, refs, target, _options):
+    def map(self, store, origin, refs, target, options):
 
         if origin == "org.osbuild.pipeline":
             for ref, options in refs.items():

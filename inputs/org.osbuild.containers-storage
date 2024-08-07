@@ -99,7 +99,7 @@ class ContainersStorageInput(inputs.InputService):
         os.makedirs(dest, exist_ok=True)
         self.mg.mount(source, dest)
 
-    def map(self, store, origin, refs, target, _options):
+    def map(self, store, origin, refs, target, options):
         self.bind_mount_local_storage(target)
 
         images = {}

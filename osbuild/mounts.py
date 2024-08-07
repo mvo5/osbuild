@@ -112,7 +112,7 @@ class MountManager:
         return {"path": path}
 
 
-class MountService(host.Service):
+class MountService(host.DispatchMixin, host.Service):
     """Mount host service"""
 
     @abc.abstractmethod
@@ -125,13 +125,6 @@ class MountService(host.Service):
 
     def stop(self):
         self.umount()
-
-    def dispatch(self, method: str, args, _fds):
-        if method == "mount":
-            r = self.mount(args)
-            return r, None
-
-        raise host.ProtocolError("Unknown method")
 
 
 class FileSystemMountService(MountService):

@@ -116,27 +116,7 @@ def make_args_and_reply_files(tmp, args):
         yield f_args.fileno(), f_reply.fileno()
 
 
-class DispatchMixin:
-    def dispatch(self, method, args, fds):
-        with os.fdopen(fds.steal(0)) as f:
-            args = json.load(f)
-
-        pre_fn = getattr(self, "pre_" + method, None)
-        if pre_fn:
-            pre_fn(args, fds)
-        fn = getattr(self, method, None)
-        if fn is None:
-            host.ProtocolError(f"Unknown method {method}")
-        r = fn(**args)
-
-        with os.fdopen(fds.steal(1), "w") as f:
-            f.write(json.dumps(r))
-            f.seek(0)
-        # XXX: remove entirely?
-        return "{}", None
-
-
-class InputService(DispatchMixin, host.Service):
+class InputService(host.DispatchMixin, host.Service):
     """Input host service"""
 
     @abc.abstractmethod

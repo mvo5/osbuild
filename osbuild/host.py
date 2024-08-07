@@ -41,6 +41,7 @@ import asyncio
 import fcntl
 import importlib
 import io
+import json
 import os
 import signal
 import subprocess
@@ -550,3 +551,29 @@ class ServiceManager:
         self.event_loop.call_soon_threadsafe(self.event_loop.stop)
         self.thread.join()
         self.event_loop.close()
+
+
+class DispatchMixin:
+
+    def dispatch(self, method, args, fds):
+        with os.fdopen(fds.steal(0)) as f:
+            args = json.load(f)
+
+        pre_fn = getattr(self, "pre_" + method, None)
+        if pre_fn:
+            pre_fn(args, fds)
+
+        fn_with_fds = getattr(self, method + "_with_fds", None)
+        if fn_with_fds:
+            r = fn_with_fds(**args, fds=FdSet.from_list(list(fds._fds[2:])))
+        else:
+            fn = getattr(self, method, None)
+            if fn is None:
+                host.ProtocolError(f"Unknown method {method}")
+            r = fn(**args)
+
+        with os.fdopen(fds.steal(1), "w") as f:
+            f.write(json.dumps(r))
+            f.seek(0)
+        # XXX: remove entirely?
+        return "{}", None

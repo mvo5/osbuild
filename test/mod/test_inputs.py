@@ -13,7 +13,7 @@ class FakeInputService(inputs.InputService):
         # do not call "super().__init__()" here to make it testable
         self._map_calls = []
         
-    def map(self, _store, origin, refs, target, options):
+    def map(self, store, origin, refs, target, options):
         self._map_calls.append([origin, refs, target, options])
         return "complex", 2, "reply"
 

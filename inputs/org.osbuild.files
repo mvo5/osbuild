@@ -196,7 +196,7 @@ class FilesInput(inputs.InputService):
         data = data.get("metadata", {})
         return ref, data
 
-    def map(self, store, origin, refs, target, _options):
+    def map(self, store, origin, refs, target, options):
 
         source = store.source("org.osbuild.files")
         files = {}

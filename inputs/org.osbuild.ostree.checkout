@@ -97,7 +97,7 @@ def checkout(checksums, cache, output):
 
 class OSTreeCheckoutInput(inputs.InputService):
 
-    def map(self, store, origin, refs, target, _options):
+    def map(self, store, origin, refs, target, options):
 
         ids = []
 

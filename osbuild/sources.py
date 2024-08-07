@@ -79,7 +79,7 @@ class Source:
         return []
 
 
-class SourceService(host.Service):
+class SourceService(host.DispatchMixin, host.Service):
     """Source host service"""
 
     max_workers = 1
@@ -105,22 +105,9 @@ class SourceService(host.Service):
         """Returns True if the item to download is in cache. """
         return os.path.isfile(f"{self.cache}/{checksum}")
 
-    @staticmethod
-    def load_items(fds):
-        with os.fdopen(fds.steal(0)) as f:
-            items = json.load(f)
-        return items
-
-    def setup(self, args):
-        self.cache = os.path.join(args["cache"], self.content_type)
+    def download_with_fds(self, cache, options, fds):
+        self.cache = os.path.join(cache, self.content_type)
         os.makedirs(self.cache, exist_ok=True)
-        self.options = args["options"]
-
-    def dispatch(self, method: str, args, fds):
-        if method == "download":
-            self.setup(args)
-            with tempfile.TemporaryDirectory(prefix=".unverified-", dir=self.cache) as self.tmpdir:
-                self.fetch_all(SourceService.load_items(fds))
-                return None, None
-
-        raise host.ProtocolError("Unknown method")
+        self.options = options
+        with tempfile.TemporaryDirectory(prefix=".unverified-", dir=self.cache) as self.tmpdir:
+            self.fetch_all(SourceService.load_items(fds))
