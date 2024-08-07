@@ -116,7 +116,27 @@ def make_args_and_reply_files(tmp, args):
         yield f_args.fileno(), f_reply.fileno()
 
 
-class InputService(host.Service):
+class DispatchMixin:
+    def dispatch(self, method, args, fds):
+        with os.fdopen(fds.steal(0)) as f:
+            args = json.load(f)
+
+        pre_fn = getattr(self, "pre_" + method, None)
+        if pre_fn:
+            pre_fn(args, fds)
+        fn = getattr(self, method, None)
+        if fn is None:
+            host.ProtocolError(f"Unknown method {method}")
+        r = fn(**args)
+
+        with os.fdopen(fds.steal(1), "w") as f:
+            f.write(json.dumps(r))
+            f.seek(0)
+        # XXX: remove entirely?
+        return "{}", None
+
+
+class InputService(DispatchMixin, host.Service):
     """Input host service"""
 
     @abc.abstractmethod
@@ -129,21 +149,7 @@ class InputService(host.Service):
     def stop(self):
         self.unmap()
 
-    def dispatch(self, method: str, _, fds):
-        if method == "map":
-            # map() sends fd[0] to read the arguments from and fd[1] to
-            # write the reply back. This avoids running into EMSGSIZE
-            with os.fdopen(fds.steal(0)) as f:
-                args = json.load(f)
-            store = StoreClient(connect_to=args["api"]["store"])
-            r = self.map(store,
-                         args["origin"],
-                         args["refs"],
-                         args["target"],
-                         args["options"])
-            with os.fdopen(fds.steal(1), "w") as f:
-                f.write(json.dumps(r))
-                f.seek(0)
-            return "{}", None
-
-        raise host.ProtocolError("Unknown method")
+    def pre_map(self, args, _fds):
+        store = StoreClient(connect_to=args["api"]["store"])
+        args.pop("api")
+        args["store"] = store

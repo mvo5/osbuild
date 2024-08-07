@@ -20,7 +20,7 @@ SCHEMA = """
 
 class NoopInput(inputs.InputService):
 
-    def map(self, _store, _origin, refs, target, _options):
+    def map(self, store, origin, refs, target, options):
 
         uid = str(uuid.uuid4())
         path = os.path.join(target, uid)
