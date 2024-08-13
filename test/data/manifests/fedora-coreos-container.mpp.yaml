@@ -28,6 +28,7 @@ mpp-vars:
   # really use FCOS as the buildroot so we'll use a generic Fedora
   # buildroot here.
   buildroot: "name:build"
+  squashfs_compression: "zstd"
 mpp-define-images:
   - id: image
     sector_size:
@@ -871,3 +872,36 @@ pipelines:
             type: qcow2
             compression: false
             compat: '1.1'
+  - name: live
+    build:
+      mpp-format-string: '{buildroot}'
+    stages:
+      - type: org.osbuild.coreos.live-artifacts.mono
+        inputs:
+          deployed-tree:
+            type: org.osbuild.tree
+            origin: org.osbuild.pipeline
+            references:
+              - name:deployed-tree
+          metal:
+            type: org.osbuild.files
+            origin: org.osbuild.pipeline
+            references:
+              name:metal:
+                file: /metal.raw
+          metal4k:
+            type: org.osbuild.files
+            origin: org.osbuild.pipeline
+            references:
+              name:metal4k:
+                file: /metal4k.raw
+        options:
+          filenames:
+            live-iso:
+              mpp-format-string: 'coreos-live-iso.{arch}.iso'
+            live-kernel:
+              mpp-format-string: 'coreos-live-kernel.{arch}'
+            live-initramfs:
+              mpp-format-string: 'coreos-live-initramfs.{arch}.img'
+            live-rootfs:
+              mpp-format-string: 'coreos-live-rootfs.{arch}.img'

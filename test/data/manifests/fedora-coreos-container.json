@@ -446,7 +446,7 @@
               "type": "org.osbuild.containers",
               "origin": "org.osbuild.source",
               "references": {
-                "sha256:66d1012cb68ea1ec0c38a830499feadb2c9e015162a5acb818f65afb6f25d0e5": {
+                "sha256:eff4685d197e6224eca444ae41d5092c6541fbabc5ce2ebfea2232fd75b9741b": {
                   "name": "registry.gitlab.com/redhat/services/products/image-builder/ci/images/fedora-coreos:testing"
                 }
               }
@@ -1576,6 +1576,50 @@
               "type": "qcow2",
               "compression": false,
               "compat": "1.1"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "live",
+      "build": "name:build",
+      "stages": [
+        {
+          "type": "org.osbuild.coreos.live-artifacts.mono",
+          "inputs": {
+            "deployed-tree": {
+              "type": "org.osbuild.tree",
+              "origin": "org.osbuild.pipeline",
+              "references": [
+                "name:deployed-tree"
+              ]
+            },
+            "metal": {
+              "type": "org.osbuild.files",
+              "origin": "org.osbuild.pipeline",
+              "references": {
+                "name:metal": {
+                  "file": "/metal.raw"
+                }
+              }
+            },
+            "metal4k": {
+              "type": "org.osbuild.files",
+              "origin": "org.osbuild.pipeline",
+              "references": {
+                "name:metal4k": {
+                  "file": "/metal4k.raw"
+                }
+              }
+            }
+          },
+          "options": {
+            "filenames": {
+              "live-iso": "coreos-live-iso.x86_64.iso",
+              "live-kernel": "coreos-live-kernel.x86_64",
+              "live-initramfs": "coreos-live-initramfs.x86_64.img",
+              "live-rootfs": "coreos-live-rootfs.x86_64.img"
             }
           }
         }
