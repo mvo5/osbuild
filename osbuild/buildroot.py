@@ -255,11 +255,12 @@ class BuildRoot(contextlib.AbstractContextManager):
         # In case `libdir` contains the python module, it must be self-contained
         # and we provide nothing else. Otherwise, we additionally look for
         # the installed `osbuild` module and bind-mount it as well.
-        mounts += ["--ro-bind", f"{self._libdir}", "/run/osbuild/lib"]
-        if not os.listdir(os.path.join(self._libdir, "osbuild")):
+        for i, libdir in enumerate(self._libdir.split(":")):
+            mounts += ["--ro-bind", libdir, f"/run/osbuild/lib{i}"]
+        if not os.listdir(os.path.join(self._libdir.split(":")[0], "osbuild")):
             modorigin = importlib.util.find_spec("osbuild").origin
             modpath = os.path.dirname(modorigin)
-            mounts += ["--ro-bind", f"{modpath}", "/run/osbuild/lib/osbuild"]
+            mounts += ["--ro-bind", f"{modpath}", "/run/osbuild/lib0/osbuild"]
 
         # Setup /proc overrides
         for override in self.proc.overrides:
@@ -309,7 +310,8 @@ class BuildRoot(contextlib.AbstractContextManager):
             "container": "bwrap-osbuild",
             "LC_CTYPE": "C.UTF-8",
             "PATH": "/usr/sbin:/usr/bin",
-            "PYTHONPATH": "/run/osbuild/lib",
+            "PYTHONPATH": ":".join(f"/run/osbuild/lib{i}"
+                                   for i in range(len(self._libdir))),
             "PYTHONUNBUFFERED": "1",
             "TERM": os.getenv("TERM", "dumb"),
         }

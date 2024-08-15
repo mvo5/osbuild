@@ -101,7 +101,7 @@ def make_test_cases():
                 yield source, case
 
 
-def check_case(source, case, store, libdir):
+def check_case(source, case, store, libdir="."):
     with host.ServiceManager() as mgr:
         expects = case["expects"]
         if expects == "error":
@@ -131,5 +131,5 @@ def test_sources(source, case, tmp_path):
 
     with osbuild.objectstore.ObjectStore(tmp_path) as store, \
             fileServer(test.TestBase.locate_test_data()):
-        check_case(src, case_options, store, index.path)
-        check_case(src, case_options, store, index.path)
+        check_case(src, case_options, store)
+        check_case(src, case_options, store)
