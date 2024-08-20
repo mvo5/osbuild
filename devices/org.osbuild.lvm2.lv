@@ -212,6 +212,11 @@ class LVService(devices.DeviceService):
 
         os.makedirs(os.path.join(devpath, vg), exist_ok=True)  # type: ignore
         self.ensure_device_node(fullpath, major, minor)
+        # also create the mapper dir as this is what findmnt will need to
+        # get the uuid
+        os.makedirs(os.path.join(devpath, "mapper"), exist_ok=True)
+        mapper_path = os.path.join(devpath, "mapper", vg.replace("-", "--") + "-" + lv.replace("-", "--"))
+        self.ensure_device_node(mapper_path, major, minor)
 
         data = {
             "path": devname,
