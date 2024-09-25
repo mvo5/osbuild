@@ -49,6 +49,10 @@ def main(tree, inputs, options):
     kopts = options.get("kernel_opts", [])
     target_imgref = options.get("target_imgref")
 
+    # XXX: find a better way to include this only conditionally, e.g.
+    # when there is a debug mode enabled
+    os.environ["QEMU_LOG"] = "unimp"
+
     # schema should catch the case in which there are more
     # than one input but this adds a second layer of security
     if len(inputs) > 1:
