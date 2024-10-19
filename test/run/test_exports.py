@@ -58,7 +58,7 @@ def testing_libdir_fixture(tmpdir_factory):
     # in buildroot.py
     (fake_libdir_path / "osbuild").mkdir()
     # construct minimal viable libdir from current checkout
-    for d in ["stages", "runners", "schemas", "assemblers"]:
+    for d in ["stages", "runners", "schemas", "assemblers", "sources"]:
         subprocess.run(
             ["cp", "-a", os.fspath(project_path / d), f"{fake_libdir_path}"],
             check=True)
@@ -91,3 +91,45 @@ def test_exports_with_force_no_preserve_owner(osb, tmp_path, jsondata, testing_l
         assert expected_export.exists()
         assert expected_export.stat().st_uid == 0
     assert k not in os.environ
+
+
+# XXX: put into a more fitting place
+@pytest.mark.skipif(os.getuid() != 0, reason="root-only")
+def test_build_root_from_container_registry(osb, tmp_path, testing_libdir):
+    # XXX: this test uses the fact that /usr/bin/subscription-manager is
+    # avaialble as an indicator that the buildroot was constructed from
+    # the ubi9:latest container. This is not a great detection, instead
+    # we should just provide our own testing container that puts some
+    # canary data into /usr (note that /etc is not available in a buildroot)
+    cnt_ref = "registry.access.redhat.com/ubi9:latest"
+    img_id = subprocess.check_output(["podman", "pull", "-q", cnt_ref], text=True).strip()
+    jsondata = json.dumps({
+        "version": "2",
+        "pipelines": [
+            {
+                "name": "image",
+                "build": f"container:sha256:{img_id}",
+                "stages": [
+                    {
+                        "type": "org.osbuild.testing.injectpy",
+                        "options": {
+                            "code": [
+                                'import os.path',
+                                'assert os.path.exists("/usr/bin/subscription-manager")',
+                            ],
+                        },
+                    },
+                ],
+            },
+        ],
+        "sources": {
+            "org.osbuild.containers-storage": {
+                "items": {
+                    f"sha256:{img_id}": {}
+                }
+            }
+        }
+    })
+
+
+    osb.compile(jsondata, output_dir=tmp_path, exports=["image"], libdir=testing_libdir)

@@ -11,7 +11,7 @@ from .api import API
 from .devices import Device, DeviceManager
 from .inputs import Input, InputManager
 from .mounts import Mount, MountManager
-from .objectstore import ObjectStore
+from .objectstore import ContainerMountTree, ObjectStore
 from .sources import Source
 from .util import osrelease
 
@@ -313,6 +313,9 @@ class Pipeline:
 
         if not self.build:
             build_tree = object_store.host_tree
+        elif self.build.startswith("container:"):
+            cnt_id = self.build.removeprefix("container:")
+            build_tree = ContainerMountTree(cnt_id)
         else:
             build_tree = object_store.get(self.build)
 
@@ -365,6 +368,10 @@ class Pipeline:
             if stage.checkpoint:
                 object_store.commit(tree, stage.id)
 
+        # XXX: needs a test but pretty sure we need this (i.e. this is
+        # a pre-existing leak) as AFAICT HostTree is never umounted
+        # otherwise (and ContainerMountTree now of course)
+        build_tree.cleanup()
         tree.finalize()
 
         return results
@@ -457,7 +464,7 @@ class Manifest:
 
             # Add all dependencies to the stack of things to check,
             # starting with the build pipeline, if there is one
-            if pl.build:
+            if pl.build and not pl.build.startswith("container:"):
                 check.append(self.get(pl.build))
 
             # Stages depend on other pipeline via pipeline inputs.
