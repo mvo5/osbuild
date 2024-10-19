@@ -3,6 +3,7 @@ import contextlib
 import hashlib
 import json
 import os
+import subprocess
 from fnmatch import fnmatch
 from typing import Dict, Generator, Iterable, Iterator, List, Optional
 
@@ -390,6 +391,8 @@ class Manifest:
     def __init__(self):
         self.pipelines = collections.OrderedDict()
         self.sources = []
+        # XXX: ?
+        self.from_container = None
 
     def add_pipeline(
         self,
@@ -418,6 +421,21 @@ class Manifest:
                 source.download(mgr, store)
                 monitor.finish({"name": source.info.name})
 
+    @contextlib.contextmanager
+    def container_mount(self):
+        # XXX: copied from org.osbuild.container-deploy
+        if self.from_container:
+            subprocess.run(
+                ["podman", "image", "mount", self.from_container],
+                check=True,
+            )
+        yield
+        if self.from_container:
+            subprocess.run(
+                ["podman", "image", "umount", self.from_container],
+                check=True,
+            )
+                
     def depsolve(self, store: ObjectStore, targets: Iterable[str]) -> List[str]:
         """Return the list of pipelines that need to be built
 

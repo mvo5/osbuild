@@ -390,6 +390,10 @@ def load(description: Dict, index: Index) -> Manifest:
         runner = runners[pipeline.build]
         pipeline.runner = runner
 
+    # XXX: container-mount instead? multiple ones? more abstraction?
+    # merge with source?
+    manifest.from_container = description.get("from-container")
+
     return manifest
 
 

@@ -181,15 +181,16 @@ def osbuild_cli() -> int:
             monitor.log(f"starting {args.manifest_path}", origin="osbuild.main_cli")
 
             manifest.download(object_store, monitor)
-
-            r = manifest.build(
-                object_store,
-                pipelines,
-                monitor,
-                args.libdir,
-                debug_break,
-                stage_timeout=stage_timeout
-            )
+            # XXX: ctx manager?
+            with manifest.container_mount():
+                r = manifest.build(
+                    object_store,
+                    pipelines,
+                    monitor,
+                    args.libdir,
+                    debug_break,
+                    stage_timeout=stage_timeout
+                )
             if r["success"]:
                 monitor.log(f"manifest {args.manifest_path} finished successfully\n", origin="osbuild.main_cli")
             else:
