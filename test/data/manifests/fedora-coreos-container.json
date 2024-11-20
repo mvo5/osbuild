@@ -437,10 +437,45 @@
       ]
     },
     {
+      "name": "deployed-tree",
+      "stages": [
+        {
+          "type": "org.osbuild.container-deploy",
+          "inputs": {
+            "images": {
+              "type": "org.osbuild.containers",
+              "origin": "org.osbuild.source",
+              "references": {
+                "sha256:66d1012cb68ea1ec0c38a830499feadb2c9e015162a5acb818f65afb6f25d0e5": {
+                  "name": "registry.gitlab.com/redhat/services/products/image-builder/ci/images/fedora-coreos:testing"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "tree",
       "build": "name:build",
       "source-epoch": 1659397331,
       "stages": [
+        {
+          "type": "org.osbuild.selinux",
+          "options": {
+            "file_contexts": "input://tree/etc/selinux/targeted/contexts/files/file_contexts",
+            "target": "tree:///"
+          },
+          "inputs": {
+            "tree": {
+              "type": "org.osbuild.tree",
+              "origin": "org.osbuild.pipeline",
+              "references": [
+                "name:deployed-tree"
+              ]
+            }
+          }
+        },
         {
           "type": "org.osbuild.ostree.init-fs"
         },
@@ -470,7 +505,7 @@
             "paths": [
               {
                 "path": "/boot/efi",
-                "mode": 448
+                "mode": 493
               }
             ]
           }
@@ -489,7 +524,8 @@
             ],
             "kernel_opts": [
               "rw",
-              "$ignition_firstboot"
+              "$ignition_firstboot",
+              "mitigations=auto,nosmt"
             ]
           },
           "inputs": {
@@ -531,7 +567,7 @@
           "type": "org.osbuild.truncate",
           "options": {
             "filename": "disk.img",
-            "size": "10737418240"
+            "size": "3221225472"
           }
         },
         {
@@ -573,7 +609,7 @@
               {
                 "start": 1050624,
                 "partnum": 4,
-                "size": 4194304,
+                "size": 5238784,
                 "type": "0FC63DAF-8483-4772-8E79-3D69D8477DE4",
                 "name": "root"
               }
@@ -613,7 +649,8 @@
           },
           "options": {
             "uuid": "96d15588-3596-4b3c-adca-a2ff7279ea63",
-            "label": "boot"
+            "label": "boot",
+            "metadata_csum_seed": true
           }
         },
         {
@@ -624,7 +661,7 @@
               "options": {
                 "filename": "disk.img",
                 "start": 1050624,
-                "size": 4194304,
+                "size": 5238784,
                 "lock": true
               }
             }
@@ -633,6 +670,121 @@
             "uuid": "910678ff-f77e-4a7d-8d53-86f2ac47a823",
             "label": "root"
           }
+        },
+        {
+          "type": "org.osbuild.mkdir",
+          "options": {
+            "paths": [
+              {
+                "path": "mount://root/boot",
+                "mode": 493
+              },
+              {
+                "path": "mount://boot/efi",
+                "mode": 493
+              }
+            ]
+          },
+          "devices": {
+            "disk": {
+              "type": "org.osbuild.loopback",
+              "options": {
+                "filename": "disk.img",
+                "partscan": true
+              }
+            }
+          },
+          "mounts": [
+            {
+              "name": "root",
+              "type": "org.osbuild.xfs",
+              "source": "disk",
+              "partition": 4,
+              "target": "/root-mount-point"
+            },
+            {
+              "name": "boot",
+              "type": "org.osbuild.ext4",
+              "source": "disk",
+              "partition": 3,
+              "target": "/boot-mount-point"
+            }
+          ]
+        },
+        {
+          "type": "org.osbuild.selinux",
+          "options": {
+            "file_contexts": "input://tree/etc/selinux/targeted/contexts/files/file_contexts",
+            "target": "mount://root/"
+          },
+          "inputs": {
+            "tree": {
+              "type": "org.osbuild.tree",
+              "origin": "org.osbuild.pipeline",
+              "references": [
+                "name:deployed-tree"
+              ]
+            }
+          },
+          "devices": {
+            "disk": {
+              "type": "org.osbuild.loopback",
+              "options": {
+                "filename": "disk.img",
+                "partscan": true
+              }
+            }
+          },
+          "mounts": [
+            {
+              "name": "root",
+              "type": "org.osbuild.xfs",
+              "source": "disk",
+              "partition": 4,
+              "target": "/"
+            }
+          ]
+        },
+        {
+          "type": "org.osbuild.selinux",
+          "options": {
+            "file_contexts": "input://tree/etc/selinux/targeted/contexts/files/file_contexts",
+            "target": "mount://root/boot/"
+          },
+          "inputs": {
+            "tree": {
+              "type": "org.osbuild.tree",
+              "origin": "org.osbuild.pipeline",
+              "references": [
+                "name:deployed-tree"
+              ]
+            }
+          },
+          "devices": {
+            "disk": {
+              "type": "org.osbuild.loopback",
+              "options": {
+                "filename": "disk.img",
+                "partscan": true
+              }
+            }
+          },
+          "mounts": [
+            {
+              "name": "root",
+              "type": "org.osbuild.xfs",
+              "source": "disk",
+              "partition": 4,
+              "target": "/"
+            },
+            {
+              "name": "boot",
+              "type": "org.osbuild.ext4",
+              "source": "disk",
+              "partition": 3,
+              "target": "/boot"
+            }
+          ]
         },
         {
           "type": "org.osbuild.copy",
@@ -778,7 +930,7 @@
           "type": "org.osbuild.truncate",
           "options": {
             "filename": "disk.img",
-            "size": "10737418240"
+            "size": "3221225472"
           }
         },
         {
@@ -821,7 +973,7 @@
               {
                 "start": 131328,
                 "partnum": 4,
-                "size": 524288,
+                "size": 654848,
                 "type": "0FC63DAF-8483-4772-8E79-3D69D8477DE4",
                 "name": "root"
               }
@@ -863,7 +1015,8 @@
           },
           "options": {
             "uuid": "96d15588-3596-4b3c-adca-a2ff7279ea63",
-            "label": "boot"
+            "label": "boot",
+            "metadata_csum_seed": true
           }
         },
         {
@@ -874,7 +1027,7 @@
               "options": {
                 "filename": "disk.img",
                 "start": 131328,
-                "size": 524288,
+                "size": 654848,
                 "lock": true,
                 "sector-size": 4096
               }
@@ -884,6 +1037,124 @@
             "uuid": "910678ff-f77e-4a7d-8d53-86f2ac47a823",
             "label": "root"
           }
+        },
+        {
+          "type": "org.osbuild.mkdir",
+          "options": {
+            "paths": [
+              {
+                "path": "mount://root/boot",
+                "mode": 493
+              },
+              {
+                "path": "mount://boot/efi",
+                "mode": 493
+              }
+            ]
+          },
+          "devices": {
+            "disk": {
+              "type": "org.osbuild.loopback",
+              "options": {
+                "filename": "disk.img",
+                "partscan": true,
+                "sector-size": 4096
+              }
+            }
+          },
+          "mounts": [
+            {
+              "name": "root",
+              "type": "org.osbuild.xfs",
+              "source": "disk",
+              "partition": 4,
+              "target": "/root-mount-point"
+            },
+            {
+              "name": "boot",
+              "type": "org.osbuild.ext4",
+              "source": "disk",
+              "partition": 3,
+              "target": "/boot-mount-point"
+            }
+          ]
+        },
+        {
+          "type": "org.osbuild.selinux",
+          "options": {
+            "file_contexts": "input://tree/etc/selinux/targeted/contexts/files/file_contexts",
+            "target": "mount://root/"
+          },
+          "inputs": {
+            "tree": {
+              "type": "org.osbuild.tree",
+              "origin": "org.osbuild.pipeline",
+              "references": [
+                "name:deployed-tree"
+              ]
+            }
+          },
+          "devices": {
+            "disk": {
+              "type": "org.osbuild.loopback",
+              "options": {
+                "filename": "disk.img",
+                "partscan": true,
+                "sector-size": 4096
+              }
+            }
+          },
+          "mounts": [
+            {
+              "name": "root",
+              "type": "org.osbuild.xfs",
+              "source": "disk",
+              "partition": 4,
+              "target": "/"
+            }
+          ]
+        },
+        {
+          "type": "org.osbuild.selinux",
+          "options": {
+            "file_contexts": "input://tree/etc/selinux/targeted/contexts/files/file_contexts",
+            "target": "mount://root/boot/"
+          },
+          "inputs": {
+            "tree": {
+              "type": "org.osbuild.tree",
+              "origin": "org.osbuild.pipeline",
+              "references": [
+                "name:deployed-tree"
+              ]
+            }
+          },
+          "devices": {
+            "disk": {
+              "type": "org.osbuild.loopback",
+              "options": {
+                "filename": "disk.img",
+                "partscan": true,
+                "sector-size": 4096
+              }
+            }
+          },
+          "mounts": [
+            {
+              "name": "root",
+              "type": "org.osbuild.xfs",
+              "source": "disk",
+              "partition": 4,
+              "target": "/"
+            },
+            {
+              "name": "boot",
+              "type": "org.osbuild.ext4",
+              "source": "disk",
+              "partition": 3,
+              "target": "/boot"
+            }
+          ]
         },
         {
           "type": "org.osbuild.copy",
@@ -1089,6 +1360,32 @@
       ]
     },
     {
+      "name": "metal",
+      "build": "name:build",
+      "stages": [
+        {
+          "type": "org.osbuild.copy",
+          "inputs": {
+            "tree": {
+              "type": "org.osbuild.tree",
+              "origin": "org.osbuild.pipeline",
+              "references": [
+                "name:raw-metal-image"
+              ]
+            }
+          },
+          "options": {
+            "paths": [
+              {
+                "from": "input://tree/disk.img",
+                "to": "tree:///metal.raw"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "raw-metal4k-image",
       "build": "name:build",
       "stages": [
@@ -1157,6 +1454,32 @@
       ]
     },
     {
+      "name": "metal4k",
+      "build": "name:build",
+      "stages": [
+        {
+          "type": "org.osbuild.copy",
+          "inputs": {
+            "tree": {
+              "type": "org.osbuild.tree",
+              "origin": "org.osbuild.pipeline",
+              "references": [
+                "name:raw-metal4k-image"
+              ]
+            }
+          },
+          "options": {
+            "paths": [
+              {
+                "from": "input://tree/disk.img",
+                "to": "tree:///metal4k.raw"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "raw-qemu-image",
       "build": "name:build",
       "stages": [
@@ -1178,6 +1501,13 @@
                 "to": "tree:///disk.img"
               }
             ]
+          }
+        },
+        {
+          "type": "org.osbuild.truncate",
+          "options": {
+            "filename": "disk.img",
+            "size": "10737418240"
           }
         },
         {
@@ -1220,58 +1550,6 @@
               "target": "/boot"
             }
           ]
-        }
-      ]
-    },
-    {
-      "name": "metal",
-      "build": "name:build",
-      "stages": [
-        {
-          "type": "org.osbuild.copy",
-          "inputs": {
-            "tree": {
-              "type": "org.osbuild.tree",
-              "origin": "org.osbuild.pipeline",
-              "references": [
-                "name:raw-metal-image"
-              ]
-            }
-          },
-          "options": {
-            "paths": [
-              {
-                "from": "input://tree/disk.img",
-                "to": "tree:///metal.raw"
-              }
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "metal4k",
-      "build": "name:build",
-      "stages": [
-        {
-          "type": "org.osbuild.copy",
-          "inputs": {
-            "tree": {
-              "type": "org.osbuild.tree",
-              "origin": "org.osbuild.pipeline",
-              "references": [
-                "name:raw-metal4k-image"
-              ]
-            }
-          },
-          "options": {
-            "paths": [
-              {
-                "from": "input://tree/disk.img",
-                "to": "tree:///metal4k.raw"
-              }
-            ]
-          }
         }
       ]
     },
