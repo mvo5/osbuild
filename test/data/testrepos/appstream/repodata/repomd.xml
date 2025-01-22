@@ -13,12 +13,10 @@
     <open-size>51840420</open-size>
   </data>
   <data type="filelists">
-    <checksum type="sha256">72d4b6933f70291d407371a5ebc4cdb26b3e0ea37b176657a8f3e4d40d9f32f6</checksum>
-    <open-checksum type="sha256">98e9a2fa4d9193dad4cea8cc14915bb5ce80a197f43b1a6e51e8bc794d7c4708</open-checksum>
-    <location href="repodata/72d4b6933f70291d407371a5ebc4cdb26b3e0ea37b176657a8f3e4d40d9f32f6-filelists.xml.gz"/>
-    <timestamp>1736761560</timestamp>
-    <size>18585311</size>
-    <open-size>287662000</open-size>
+    <checksum type="sha256">45124768eff5c16dea32a9f2edbe69bd858f4f9e4dde8f5c9615dd32101b7ef8</checksum>
+    <location href="repodata/45124768eff5c16dea32a9f2edbe69bd858f4f9e4dde8f5c9615dd32101b7ef8-filelists.xml.gz"/>
+    <size>203</size>
+    <open-size>126</open-size>
   </data>
   <data type="other">
     <checksum type="sha256">04e14388439e5b0aa6ea3807a6f7168647b02ad591d84290ae4f8a037a524a2d</checksum>
