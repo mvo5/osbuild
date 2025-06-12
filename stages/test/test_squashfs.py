@@ -9,20 +9,17 @@ import pytest
 from osbuild import testutil
 from osbuild.testutil import has_executable, make_fake_input_tree
 
-TEST_INPUT = [
-    ({}, []),
-    ({"compression": {"method": "lz4"}}, ["-comp", "lz4"]),
-    ({"compression": {"method": "xz", "options": {"bcj": "x86"}}}, ["-comp", "xz", "-Xbcj", "x86"]),
-    ({"exclude_paths": ["boot/.*", "root/.*"]}, ["-regex", "-e", "boot/.*", "root/.*"])
-]
-
-
 STAGE_NAME = "org.osbuild.squashfs"
 
 
 @pytest.mark.skipif(not has_executable("mksquashfs"), reason="no mksquashfs")
-@pytest.mark.parametrize("test_options,expected", TEST_INPUT)
-def test_squashfs_integration(tmp_path, stage_module, test_options, expected):  # pylint: disable=unused-argument
+@pytest.mark.parametrize("test_options,included,excluded", [
+    ({}, ["subdir/file-in-subdir.txt\n", "file-in-root.txt\n"], []),
+    ({"compression": {"method": "lz4"}}, ["subdir/file-in-subdir.txt\n", "file-in-root.txt\n"], []),
+    ({"compression": {"method": "xz", "options": {"bcj": "x86"}}}, ["subdir/file-in-subdir.txt\n", "file-in-root.txt\n"], []),
+    ({"exclude_paths": ["subdir/.*"]}, ["file-in-root.txt\n"], ["subdir/file-in-subdir.txt\n"]),
+])
+def test_squashfs_integration(tmp_path, stage_module, test_options, included, excluded):  # pylint: disable=unused-argument
     fake_input_tree = make_fake_input_tree(tmp_path, {
         "/file-in-root.txt": "other content",
         "/subdir/file-in-subdir.txt": "subdir content",
@@ -45,16 +42,21 @@ def test_squashfs_integration(tmp_path, stage_module, test_options, expected):  
     # validate the content
     output = subprocess.check_output([
         "unsquashfs", "-ls", img_path], encoding="utf-8")
-    assert "subdir/file-in-subdir.txt\n" in output
-    assert "file-in-root.txt\n" in output
+    for inc in included:
+        assert inc in output
+    for exc in excluded:
+        assert not exc in output
 
 
 @mock.patch("subprocess.run")
-@pytest.mark.parametrize("test_options,expected", TEST_INPUT)
+@pytest.mark.parametrize("test_options,expected", [
+    ({}, []),
+    ({"compression": {"method": "lz4"}}, ["-comp", "lz4"]),
+    ({"compression": {"method": "xz", "options": {"bcj": "x86"}}}, ["-comp", "xz", "-Xbcj", "x86"]),
+    ({"exclude_paths": ["boot/.*", "root/.*"]}, ["-regex", "-e", "boot/.*", "root/.*"])
+])
 def test_squashfs(mock_run, tmp_path, stage_module, test_options, expected):
-    fake_input_tree = make_fake_input_tree(tmp_path, {
-        "/some-dir/some-file.txt": "content",
-    })
+    fake_input_tree = make_fake_input_tree(tmp_path, {})
     inputs = {
         "tree": {
             "path": fake_input_tree,
